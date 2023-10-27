@@ -1,5 +1,7 @@
 # Simulation de fluide pour TIPE 2023/2024
 
+Développé sous python 3.11.5
+
 ## Présentation
 
 On a 2 modes d'input pour la simulation:
