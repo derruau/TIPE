@@ -94,7 +94,7 @@ def start_game() -> None:
         mesh_id=cube_mesh_id, 
         shader_id=cube_shader_id, 
         material_id=cube_material_id
-        )
+        ) 
     
     manager = Manager(shader_manager, material_manager, mesh_manager)
     

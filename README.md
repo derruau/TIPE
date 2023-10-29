@@ -21,4 +21,7 @@ Note: les étapes de la simulation sont stockées dans un buffer temporaire, on 
 On utilise le design pattern 'model view controller'
 
 # TODO
-Ajouter des manageurs pour tout les scripts du dossier models
+- Clean le code
+- Rajouter de la documentation
+- Compléter le manuel tex
+- Rajouter de la lumière? ==> [Eclairage Blinn Phong](https://en.wikipedia.org/wiki/Blinn%E2%80%93Phong_reflection_model)
