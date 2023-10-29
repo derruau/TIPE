@@ -1,18 +1,29 @@
 """
 Une scène contient toutes les entités du niveau, c'est elle qui les gère 
 """
-from core.models.entity import Camera, Entity, Eulers
-from core.models.shader import ShaderManager
-from OpenGL.GL import glDeleteProgram
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from core.models.entity import Entity, Eulers
+    from core.controller.manager import Manager
+    from core.models.shader import Shader
+    from core.models.mesh import Mesh
+    from core.models.material import Material
 
+from core.models.entity import Camera
 
 MAX_SCENE_ENTITIES = 128
 
 class Scene:
-    def __init__(self, shader_manager:ShaderManager,cam_pos: float[list], cam_eulers: Eulers) -> None:
+    def __init__(
+            self,
+            manager: Manager,
+            cam_pos: list[float],
+            cam_eulers: Eulers
+        ) -> None:
         self.available_entity_id = {id: True for id in range(MAX_SCENE_ENTITIES)}
         self.entities: dict[int: Entity] = {}
-        self.shader_manager = shader_manager
+        self.manager = manager
 
         cam = Camera(cam_pos, cam_eulers)
         self.cam_id = self.append_entity(cam)
@@ -21,7 +32,7 @@ class Scene:
         """
         Parcours la liste des ID disponible et renvoie la première disponible
         """
-        for k,v in self.available_entity_id:
+        for k,v in self.available_entity_id.items():
             if v == True:
                 return k
         return -1
@@ -54,6 +65,13 @@ class Scene:
         
         self.available_entity_id[id] = False
         self.entities[id] = entity
+        if entity.has_mesh:
+            self.manager.mesh_manager.add_mesh_use(entity.mesh_id)
+        if entity.has_material:
+            self.manager.material_manager.add_material_use(entity.material_id)
+        if entity.has_shaders:
+            self.manager.shader_manager.add_shader_use(entity.shader_id)
+
         return id
 
     def destroy_entity(self, id) -> bool:
@@ -65,18 +83,15 @@ class Scene:
             return False
 
         entity: Entity = self.entities[id]
-        # Pas une bonne solution car si je delete un material utilisé par un autre objet dans la scene par exemple, c'est la grosse merde
-        # Peut être adopter le système du manager pour tout les scripts du dossier model??
-        # On a déjà scène qui est un EntityManager et ShaderManager 
-        # if entity.has_mesh:
-        #     entity.mesh.destroy()
-        # if entity.has_material:
-        #     entity.material.destroy()
-        # if entity.has_shaders:
-        #     self.shader_manager.destroy_shader(entity.shader_id)
-        
+        if entity.has_mesh:
+            self.manager.mesh_manager.remove_mesh_use(entity.mesh_id)
+        if entity.has_material:
+            self.manager.material_manager.remove_material_use(entity.material_id)
+        if entity.has_shaders:
+            self.manager.shader_manager.remove_shader_use(entity.shader_id)
         del entity
         self.available_entity_id[id] = True
+        
         return True
 
     def destroy_scene(self) -> bool:
@@ -84,7 +99,7 @@ class Scene:
         Méthode à utiliser si on veut supprimer la scène en entier
         """
         r = True
-        for id, available in self.available_entity_id:
+        for id, available in self.available_entity_id.items():
             if available == False:
                 r = r and self.destroy_entity(id)
         return r

@@ -1,13 +1,16 @@
 """
 App est le fichier maître du moteur de jeu, c'est par lui que tout commence
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from core.view.scene import Scene
+    from core.controller.controls import InputScheme
 
 from OpenGL.GL import *
 import glfw
 import numpy as np
 from OpenGL.GL.shaders import compileProgram, compileShader
-from core.view.scene import Scene
-from core.controller.controls import InputScheme
 from core.view.rendering_engine import RenderingEngine
 
 WINDOW_HEIGHT = 480
@@ -16,7 +19,7 @@ WINDOW_TITLE = "Moteur de jeu"
 
 
 class App:
-    __slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme")
+    #__slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme")
 
     def __init__(self, scene: Scene, input_scheme: InputScheme, handle_inputs: callable) -> None:
         """
@@ -32,12 +35,14 @@ class App:
         self._init_OpenGL()
 
         self.scene = scene
-        self.rendering_engine = RenderingEngine(self.scene, WINDOW_WIDTH / WINDOW_HEIGHT)
+        self.scene.manager.init_managers()
+        self.rendering_engine = RenderingEngine(self.scene)
 
         self.mainloop()
 
     def _init_glfw(self) -> void:
         self.last_time = 0
+        self.delta = 0
         self.frames_rendered = 0
         if not glfw.init():
             raise RuntimeError("Impossible d'initialiser GLFW.")
@@ -59,6 +64,7 @@ class App:
         self.handle_inputs = handle_inputs
         glfw.set_key_callback(self.window, self.keys_callback)
         glfw.swap_interval(1)
+        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
 
     def _init_OpenGL(self):
         glClearColor(0.1, 0.2, 0.2, 1)
@@ -70,21 +76,35 @@ class App:
         print(f"Code erreur GLFW {error}: {description}")
 
     def keys_callback(self, window, key: int, scancode: int, action: int, mods: int):
+        key_name = glfw.get_key_name(key, scancode)
+        if key_name == None:
+            # TODO: À refaire impérativement, ça marche même pas!!
+            # C'est horrible à lire et je DOIS refaire ça plus proprement
+            # Un rappel de pk je fais ça: j'arrive pas à faire correspondre l'argument key de cette fonction et getattr(glfw, 'KEY_{key}')
+            if mods == glfw.MOD_SHIFT:
+                print("yeah")
+                self.keys["shift"] = True if action == glfw.PRESS else False
+            elif mods == glfw.MOD_ALT:
+                self.keys["alt"] = True if action == glfw.PRESS else False
+            elif mods == glfw.MOD_CAPS_LOCK:
+                self.keys["caps_lock"] = True if action == glfw.PRESS else False
+            elif mods == glfw.MOD_CONTROL:
+                self.keys["ctrl"] = True if action == glfw.PRESS else False
+            elif mods == glfw.MOD_NUM_LOCK:
+                self.keys["num_lock"] = True if action == glfw.PRESS else False
+            elif mods == glfw.MOD_SUPER:
+                self.keys["super"] = True if action == glfw.PRESS else False
+            return
         match action:
-            case glfw.PRESS:
-                self.keys[key] = True
+            case glfw.PRESS:            
+                self.keys[key_name] = True
             case glfw.RELEASE:
-                self.keys[key] = False
-
-        match mods:
-            case glfw.PRESS:
-                self.keys[key] = True
-            case glfw.RELEASE:
-                self.keys[key] = False
+                self.keys[key_name] = False
 
     def calculate_fps(self):
         current_time = glfw.get_time()
         delta_t = current_time - self.last_time
+        self.delta = delta_t
         if delta_t >=1:
             framerate = max(1, int(self.frames_rendered / delta_t))
             glfw.set_window_title(self.window, f"Tourne avec {framerate}fps")
@@ -96,9 +116,10 @@ class App:
     def mainloop(self):
         while not glfw.window_should_close(self.window):
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-            self.handle_inputs(self.window, self.keys, self.scene)
+            self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
             glfw.poll_events()
 
+            self.rendering_engine.render(self.delta)
 
             glfw.swap_buffers(self.window)
             self.calculate_fps()
@@ -120,3 +141,5 @@ class App:
     def quit(self):
         glfw.destroy_window(self.window)
         glfw.terminate()
+        self.scene.manager.destroy()
+        self.scene.destroy_scene()

@@ -1,7 +1,14 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from core.view.scene import Scene
+    from core.models.mesh import Mesh
+    from core.models.material import Material
+    from core.models.shader import Shader
+
 import numpy as np
-import pyrr
 from OpenGL.GL import *
-from core.view.scene import Scene
+
 
 FOV_Y = 45
 NEAR_CLIPPING_PLANE = 0.1
@@ -47,13 +54,36 @@ class Vertices:
         return f"Nombre de points: {len(self.vertices) // 8} \n" + string
 
 class RenderingEngine:
-    def __init__(self, scene: Scene, aspect_ratio: float) -> None:
+    def __init__(self, scene: Scene) -> None:
         self.scene = scene
 
+        scene.manager.shader_manager.set_one_time_uniforms()
 
-    def render(self) -> None:
+
+    def render(self, delta: float) -> None:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        projection = pyrr.matrix44.create_perspective_projection
 
-    def destroy(self) -> None:
-        self.scene.destroy_scene()
+        view_matrix = self.scene.get_camera().get_view_matrix()
+        self.scene.manager.shader_manager.set_view_matrix(view_matrix)
+        print("=====")
+        for entity in self.scene.get_entities().values():
+            print(entity)
+            if entity.has_mesh:
+                if entity.has_shaders:
+                    shader: Shader = self.scene.manager.shader_manager.get_shaders()[entity.shader_id]
+                    glUseProgram(shader.get_shaders())
+                    glUniformMatrix4fv(
+                        glGetUniformLocation(shader.get_shaders(), "model"),
+                        1,
+                        GL_FALSE,
+                        entity.get_model_matrix()
+                    )
+                if entity.has_material:
+                    material: Material = self.scene.manager.material_manager.get_materials()[entity.material_id]
+                    material.use()
+                mesh: Mesh = self.scene.manager.mesh_manager.get_meshes()[entity.mesh_id]
+                mesh.prepare_to_draw()
+                mesh.draw()
+            entity.update(delta)
+        glFlush()
+

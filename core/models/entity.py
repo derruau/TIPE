@@ -7,8 +7,6 @@ Une entité est une classe générale qui contient les paramètres suivant:
 import pyrr
 import numpy as np
 from typing import Callable, TypedDict, NotRequired
-from mesh import Mesh
-from material import Material
 
 
 DEFAULT_ENTITY_LABEL = "Entitée"
@@ -59,19 +57,23 @@ class Eulers:
 
 class EntityOptions(TypedDict):
     """
+    TODO: Update les options pour inclure les ID et pas les objets
+
     - mesh: Si une mesh est associée à l'entitée, le préciser ici. 
     - shader_id: Préciser l'ID du shaders à utiliser pour faire le rendu de la mesh si l'entitée en possède une
     - material: Le Material à appliquer à la Mesh. Pour l'instant, le moteur de jeu ne supporte qu'un material par Mesh
     - update: Vous pouvez passer une fonction quelconque qui sera appelée à chaque fois qu'on update le Rendering Engine. Cette fonction a la signature suivante: ```update(delta: float): None``` et `delta` est le temps écoulé entre 2 frames
     """
-    mesh: NotRequired[Mesh]
+    mesh_id: NotRequired[int]
     shader_id: NotRequired[int]
-    material: NotRequired[Material]
+    material_d: NotRequired[int]
     update: NotRequired[Callable[[float], None]]
 
 
 class Entity:
     """
+    TODO: Update pour que ce soit les 
+
     La classe la plus générale qui définit un objet de la scène. \\
     Fondamentalement, une entitée est une position associé à une rotation et une échelle de taille. \\
     Elle peut cependant contenir des options telle qu'une mesh. Pour voir toutes les options, regarder la classe EntityOptions
@@ -91,7 +93,7 @@ class Entity:
         """
         self.label: str = DEFAULT_ENTITY_LABEL
         self.position = np.array(position, np.float32)
-        self.rotation = rotation.get_rad()
+        self.eulers = rotation.get_rad()
         self.scale = np.array(scale, np.float32)
 
         self.has_mesh = False
@@ -99,15 +101,15 @@ class Entity:
         self.has_shaders = False
         self.has_update_func = False
         _keys = options.keys()
-        if "mesh" in _keys:
+        if "mesh_id" in _keys:
             self.has_mesh = True
-            self.mesh = options.get("mesh", None)
+            self.mesh_id = options.get("mesh_id", None)
             if "shader_id" in _keys:
                 self.has_shaders = True
                 self.shader_id = options.get("shader_id", None)
-            if "meterial" in _keys:
+            if "meterial_id" in _keys:
                 self.has_material = True
-                self.material = options.get("material", None)
+                self.material_id = options.get("material_id", None)
         if "update" in _keys:
             self.has_update_func = True
             self.update_func = options.get("update")
@@ -132,7 +134,7 @@ class Entity:
         m = pyrr.matrix44.create_from_scale(self.scale, np.float32)
         m = pyrr.matrix44.multiply(
             m,
-            pyrr.matrix44.create_from_eulers(self.rotation, np.float32)
+            pyrr.matrix44.create_from_eulers(self.eulers, np.float32)
         )
         m = pyrr.matrix44.multiply(
             m,
@@ -147,7 +149,7 @@ class Entity:
         return self.label
     
     def __repr__(self) -> str:
-        return f"{self.label}:\n - Position: {self.position} \n - Rotation: {self.rotation} \n - Echelle: {self.scale}"
+        return f"{self.label}:\n - Position: {self.position} \n - Rotation: {self.eulers} \n - Echelle: {self.scale}"
 
 
 class Camera(Entity):
@@ -167,10 +169,11 @@ class Camera(Entity):
         eulers: (theta, phi). en coordonéées sphériques. theta représente l'orientation verticalle, et phi l'orientation horizontale
         """
 
-        super().__init__(position, Eulers(True, [0, 0, 0]), [1.0, 1.0, 1.0])
-        self.update()
+        super().__init__(position, Eulers(True, [0, 3.14159/2, 0]), [1.0, 1.0, 1.0])
+        self.update(0)
+        self.set_label("Camera")
 
-    def update(self) -> None:
+    def update(self, delta: float) -> None:
         """
         Met à jour le système de coordonnée local de la caméra
         """
@@ -196,6 +199,7 @@ class Camera(Entity):
         """
         Retourne la "View Matrix" qui est la matrice de transformation qui simule le mouvement de la caméra dans la scène.
         """
+        print(self.position, self.position + self.forward, self.up)
         return pyrr.matrix44.create_look_at(
             self.position,
             self.position + self.forward,
@@ -203,7 +207,7 @@ class Camera(Entity):
             np.float32
         )
 
-    def move_camera(self, d_pos: list[float]) -> None:
+    def move_camera(self, d_pos: np.ndarray) -> None:
         """
         Bouge la caméra selon ses coordonnées locales. \\
         d_pos est un vecteur où tout les composants sont soit 0, soit 1
@@ -217,5 +221,5 @@ class Camera(Entity):
         self.eulers += d_eulers.get_rad()
 
         self.eulers[0] %= 6.28319 # 2*PI
-        self.eulers[1] = min(1.5, max(-1.5, self.eulers[1])) # 1.5 rad ~ 86°
+        self.eulers[1] = min(3, max(0.1, self.eulers[1])) # 0 ça représente le haut et 3 ~ 2*pi le bas
         self.eulers[2] %= 6.28319 # 2*PI

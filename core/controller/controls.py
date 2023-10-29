@@ -1,7 +1,5 @@
 import glfw
 
-class InputTree:
-    pass
 
 class InputScheme:
     """
@@ -9,6 +7,7 @@ class InputScheme:
     Elle donne aussi une couche d'abstraction pour savoir si une commande doit être déclenchée en fonction
     """
     def __init__(self, path: str) -> None:
+        glfw.init()
         self.input_scheme = self.parse_input_scheme(path)
 
     def parse_input_scheme(self, path :str) -> dict[str: list[list[int]]]:
@@ -31,7 +30,7 @@ class InputScheme:
                 keys = keys.split("/")
                 current_combo:list[int] = []
                 for key in keys:
-                    current_combo.append(getattr(glfw, key))
+                    current_combo.append(key)
 
                 if bool(input_scheme.get(words[1], False)):
                     input_scheme[words[1]].append(current_combo)
@@ -43,10 +42,13 @@ class InputScheme:
         return input_scheme
 
     def should_action_happen(self, action: str, keys: dict[int: bool]) -> bool:
+        # if action == "quit_game":
+        #     print(keys)
+        #     print(self.input_scheme[action])
         for key_combo in self.input_scheme[action]:
             result:bool = True
             for key in key_combo:
-                result = result and keys[key]
+                result = result and keys.setdefault(key, False)
             if result:
                 return True
         return False
