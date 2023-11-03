@@ -42,9 +42,6 @@ class InputScheme:
         return input_scheme
 
     def should_action_happen(self, action: str, keys: dict[int: bool]) -> bool:
-        # if action == "quit_game":
-        #     print(keys)
-        #     print(self.input_scheme[action])
         for key_combo in self.input_scheme[action]:
             result:bool = True
             for key in key_combo:

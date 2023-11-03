@@ -81,9 +81,10 @@ class App:
             # TODO: À refaire impérativement, ça marche même pas!!
             # C'est horrible à lire et je DOIS refaire ça plus proprement
             # Un rappel de pk je fais ça: j'arrive pas à faire correspondre l'argument key de cette fonction et getattr(glfw, 'KEY_{key}')
-            if mods == glfw.MOD_SHIFT:
-                print("yeah")
-                self.keys["shift"] = True if action == glfw.PRESS else False
+            if key == glfw.KEY_LEFT_SHIFT:
+                self.keys["left_shift"] = True if action == glfw.PRESS else False
+            if key == glfw.KEY_SPACE:
+                self.keys["space"] = True if action == glfw.PRESS else False
             elif mods == glfw.MOD_ALT:
                 self.keys["alt"] = True if action == glfw.PRESS else False
             elif mods == glfw.MOD_CAPS_LOCK:
@@ -96,7 +97,7 @@ class App:
                 self.keys["super"] = True if action == glfw.PRESS else False
             return
         match action:
-            case glfw.PRESS:            
+            case glfw.PRESS:        
                 self.keys[key_name] = True
             case glfw.RELEASE:
                 self.keys[key_name] = False

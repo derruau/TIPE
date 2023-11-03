@@ -65,9 +65,7 @@ class RenderingEngine:
 
         view_matrix = self.scene.get_camera().get_view_matrix()
         self.scene.manager.shader_manager.set_view_matrix(view_matrix)
-        print("=====")
         for entity in self.scene.get_entities().values():
-            print(entity)
             if entity.has_mesh:
                 if entity.has_shaders:
                     shader: Shader = self.scene.manager.shader_manager.get_shaders()[entity.shader_id]

@@ -199,7 +199,6 @@ class Camera(Entity):
         """
         Retourne la "View Matrix" qui est la matrice de transformation qui simule le mouvement de la caméra dans la scène.
         """
-        print(self.position, self.position + self.forward, self.up)
         return pyrr.matrix44.create_look_at(
             self.position,
             self.position + self.forward,

@@ -21,6 +21,7 @@ Note: les étapes de la simulation sont stockées dans un buffer temporaire, on 
 On utilise le design pattern 'model view controller'
 
 # TODO
+- AJOUTER UN MOYEN DE DEPLACER LA CAMERA DANS LES COORDONNEES ABSOLUES ET NON RELATIVE AU VECTEUR FORWARD!!
 - Clean le code
 - Rajouter de la documentation
 - Compléter le manuel tex
