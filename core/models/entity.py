@@ -57,11 +57,9 @@ class Eulers:
 
 class EntityOptions(TypedDict):
     """
-    TODO: Update les options pour inclure les ID et pas les objets
-
-    - mesh: Si une mesh est associée à l'entitée, le préciser ici. 
+    - mesh_id: Préciser l'ID de la mesh associée à l'entitée, si l'entitée en possède. 
     - shader_id: Préciser l'ID du shaders à utiliser pour faire le rendu de la mesh si l'entitée en possède une
-    - material: Le Material à appliquer à la Mesh. Pour l'instant, le moteur de jeu ne supporte qu'un material par Mesh
+    - material_id: Préciser l'ID du Material à appliquer à la Mesh. Pour l'instant, le moteur de jeu ne supporte qu'un material par Mesh
     - update: Vous pouvez passer une fonction quelconque qui sera appelée à chaque fois qu'on update le Rendering Engine. Cette fonction a la signature suivante: ```update(delta: float): None``` et `delta` est le temps écoulé entre 2 frames
     """
     mesh_id: NotRequired[int]
@@ -72,8 +70,6 @@ class EntityOptions(TypedDict):
 
 class Entity:
     """
-    TODO: Update pour que ce soit les 
-
     La classe la plus générale qui définit un objet de la scène. \\
     Fondamentalement, une entitée est une position associé à une rotation et une échelle de taille. \\
     Elle peut cependant contenir des options telle qu'une mesh. Pour voir toutes les options, regarder la classe EntityOptions
@@ -87,7 +83,7 @@ class Entity:
             ) -> None:
         """
         position: En coordonnées cartésiennes dans le format [x, y, z] \\
-        rotation: La rotation par rapport à chaque axe EN RADIANS, par exemple rotation[0] est la rotation par rapport à l'axe x, etc... \\
+        rotation: La rotation par rapport à chaque axe. 
         scale: Le facteur d'échelle par rapport à chaque axe, par exemple scale[0] est l'échelle par rapport à l'axe x, etc... \\
         options: Les arguments optionnels associés à une entitée, par exemple une mesh, des shaders, un material, etc... 
         """
@@ -143,12 +139,21 @@ class Entity:
         return m
 
     def set_label(self, label: str) -> None:
+        """
+        Donne un nom à l'entitée. Utile lorsqu'on veut débugger.
+        """
         self.label = label
 
     def get_label(self) -> str:
+        """
+        Renvoie le nom de l'entitée. Si elle n'en a pas, renvoie None.
+        """
         return self.label
     
     def __repr__(self) -> str:
+        """
+        Comment apparait l'entitée lorsqu'on la print.
+        """
         return f"{self.label}:\n - Position: {self.position} \n - Rotation: {self.eulers} \n - Echelle: {self.scale}"
 
 
@@ -206,12 +211,19 @@ class Camera(Entity):
             np.float32
         )
 
-    def move_camera(self, d_pos: np.ndarray) -> None:
+    def move_camera(
+            self, 
+            d_pos: np.ndarray, 
+            d_abs_pos: np.ndarray = np.array([0,0,0], np.float32)
+            ) -> None:
         """
         Bouge la caméra selon ses coordonnées locales. \\
         d_pos est un vecteur où tout les composants sont soit 0, soit 1
         """
-        self.position += self.forward*d_pos[0] + self.right*d_pos[1] + self.up*d_pos[2]
+        self.position += self.forward*d_pos[0] \
+            + self.right*d_pos[1] \
+            + self.up*d_pos[2] \
+            + d_abs_pos
 
     def change_orientation(self, d_eulers: Eulers) -> None:
         """

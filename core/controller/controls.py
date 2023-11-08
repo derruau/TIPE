@@ -6,11 +6,19 @@ class InputScheme:
     Une classe chargée de parser un fichier de configuration pour les contrôles du moteur de jeu.
     Elle donne aussi une couche d'abstraction pour savoir si une commande doit être déclenchée en fonction
     """
+    __slots__ = ("input_scheme")
+
     def __init__(self, path: str) -> None:
+        """
+        Initialise la classe.
+        """
         glfw.init()
         self.input_scheme = self.parse_input_scheme(path)
 
     def parse_input_scheme(self, path :str) -> dict[str: list[list[int]]]:
+        """
+        Parse le fichier d'input, du même format que controls.cfg
+        """
         line_number:int = 0
         input_scheme:dict[str: list[list[int]]] = {}
         with open(path, "r") as f:
@@ -42,6 +50,10 @@ class InputScheme:
         return input_scheme
 
     def should_action_happen(self, action: str, keys: dict[int: bool]) -> bool:
+        """
+        On passe une action définit dans le fichier de configuration, et la liste des touches.
+        La fonction nous renvoit si la combinaison de clés à laquelle est associée l'action doit se produire.
+        """
         for key_combo in self.input_scheme[action]:
             result:bool = True
             for key in key_combo:

@@ -13,15 +13,18 @@ import numpy as np
 from OpenGL.GL.shaders import compileProgram, compileShader
 from core.view.rendering_engine import RenderingEngine
 
-WINDOW_HEIGHT = 480
-WINDOW_WIDTH = 640 
-WINDOW_TITLE = "Moteur de jeu"
-
-
 class App:
-    #__slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme")
+    __slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme", "scene", "rendering_engine", "delta")
 
-    def __init__(self, scene: Scene, input_scheme: InputScheme, handle_inputs: callable) -> None:
+    def __init__(
+            self, 
+            scene: Scene, 
+            input_scheme: InputScheme, 
+            handle_inputs: callable,
+            window_height: int,
+            window_width: int,
+            window_title = str
+            ) -> None:
         """
         Création d'une fenêtre et lancement du moteur de jeu. \\
         scène: passer la scène que l'application doit afficher. \\
@@ -30,7 +33,7 @@ class App:
         """
         self._init_glfw()
 
-        self._init_window(input_scheme, handle_inputs)
+        self._init_window(input_scheme, handle_inputs, window_height, window_width, window_title)
 
         self._init_OpenGL()
 
@@ -38,9 +41,13 @@ class App:
         self.scene.manager.init_managers()
         self.rendering_engine = RenderingEngine(self.scene)
 
-        self.mainloop()
+        self.main_loop()
 
     def _init_glfw(self) -> void:
+        """
+        Initialisation de glfw, ainsi que certaines variables de la classe.
+        Cette fonction ne spawn pas la fenêtre!!
+        """
         self.last_time = 0
         self.delta = 0
         self.frames_rendered = 0
@@ -49,11 +56,21 @@ class App:
         
         glfw.set_error_callback(self.error_callback)
 
-    def _init_window(self, input_scheme: InputScheme, handle_inputs: callable) -> void:
+    def _init_window(
+            self, 
+            input_scheme: InputScheme, 
+            handle_inputs: callable,
+            window_height: int,
+            window_width: int,
+            window_title
+            ) -> void:
+        """
+        Initialise la fenêtre et la config pour les inputs.
+        """
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
         glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
         glfw.window_hint(glfw.OPENGL_PROFILE,glfw.OPENGL_CORE_PROFILE)
-        self.window = glfw.create_window(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, None, None)
+        self.window = glfw.create_window(window_width, window_height, window_title, None, None)
 
         if not self.window:
             raise RuntimeError("Impossible de créer la fenêtre.")
@@ -67,15 +84,27 @@ class App:
         glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
 
     def _init_OpenGL(self):
+        """
+        Initialisation d'OpenGL, c'est ici qu'on set la couleur de background.
+        """
         glClearColor(0.1, 0.2, 0.2, 1)
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def error_callback(self, error: int, description: str):
+        """
+        La fonction qui print les erreurs de GLFW
+        """
         print(f"Code erreur GLFW {error}: {description}")
 
     def keys_callback(self, window, key: int, scancode: int, action: int, mods: int):
+        """
+        S'occupe de construire le dictionnaire self.keys qui contient les clés
+        sur lesquelles on appuie à une frame donnée.
+
+        Bug: GLFW a un bug avec le nom des clés, alors cette fonction est très mal implémentée.
+        """
         key_name = glfw.get_key_name(key, scancode)
         if key_name == None:
             # TODO: À refaire impérativement, ça marche même pas!!
@@ -103,6 +132,9 @@ class App:
                 self.keys[key_name] = False
 
     def calculate_fps(self):
+        """
+        Calcule  et actualise le nombre de FPS toute les secondes.
+        """
         current_time = glfw.get_time()
         delta_t = current_time - self.last_time
         self.delta = delta_t
@@ -114,7 +146,10 @@ class App:
 
         self.frames_rendered += 1
 
-    def mainloop(self):
+    def main_loop(self):
+        """
+        La boucle principale du jeu. Elle invoque le rendering engine et events claviers et calcule les FPS
+        """
         while not glfw.window_should_close(self.window):
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
@@ -126,20 +161,10 @@ class App:
             self.calculate_fps()
         self.quit()
 
-    def createShader(self, vertexShaderPath: str, fragmentShaderPath: str):
-        with open(vertexShaderPath, "r") as f:
-            vertex_src = f.readlines()
-        with open(fragmentShaderPath, "r") as f:
-            fragment_src = f.readlines()
-
-        shader = compileProgram(
-            compileShader(vertex_src, GL_VERTEX_SHADER),
-            compileShader(fragment_src, GL_FRAGMENT_SHADER)
-        )
-
-        return shader
-
     def quit(self):
+        """
+        Quitte le jeu, à invoquer avant de quitter l'appli.
+        """
         glfw.destroy_window(self.window)
         glfw.terminate()
         self.scene.manager.destroy()

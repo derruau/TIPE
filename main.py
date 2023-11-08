@@ -27,14 +27,24 @@ SPEED = 0.3
 CAM_SENSITIVITY = 0.2
 VERTICAL_INVERT = -1
 HORIZONTAL_INVERT = 1
+CAMERA_MOVEMENT_THRESHOLD = 0.00001
 
 def handle_inputs(window, keys: dict[int, bool], scene :Scene, input_scheme: InputScheme) -> None:
+    """
+    Est passé en paramètre de la classe App.
+    Elle s'occupe de gérer les actions lorsqu'on appuie sur le clavier et lorsqu'on bouge la camera
+    """
     handle_keys(window, keys, scene, input_scheme)
     handle_mouse(window, keys, scene, input_scheme)
 
 def handle_keys(window, keys: dict[int, bool], scene: Scene, input_scheme: InputScheme) -> None:
+    """
+    S'occupe de définir les actions à effectuer lorsqu'on appuie sur une quelconque touche du clavier.
+    Il est recommandé de ne pas traiter les boutons de la souris dans cette fonctions pour des raisons de clareté du code.
+    """
     camera = scene.get_camera()
     d_pos = np.array([0, 0, 0], np.float32)
+    d_abs_pos = np.array([0,0,0], np.float32)
     if input_scheme.should_action_happen("walk_forward", keys):
         d_pos += GLOBAL_X
     if input_scheme.should_action_happen("walk_left", keys):
@@ -44,9 +54,9 @@ def handle_keys(window, keys: dict[int, bool], scene: Scene, input_scheme: Input
     if input_scheme.should_action_happen("walk_backward", keys):
         d_pos -= GLOBAL_X
     if input_scheme.should_action_happen("go_up", keys):
-        d_pos += GLOBAL_Z
+        d_abs_pos += GLOBAL_Z
     if input_scheme.should_action_happen("go_down", keys):
-        d_pos -= GLOBAL_Z
+        d_abs_pos -= GLOBAL_Z
 
     if input_scheme.should_action_happen("quit_game", keys):
         print("Quitting...")
@@ -54,13 +64,20 @@ def handle_keys(window, keys: dict[int, bool], scene: Scene, input_scheme: Input
     
     # Normalisation du vecteur
     l = (d_pos[0]**2 + d_pos[1]**2 + d_pos[2]**2)**(1/2)
-    if l > 0.000001:
+    l_abs = (d_abs_pos[0]**2 + d_abs_pos[1]**2 + d_abs_pos[2]**2)**(1/2)
+    if l > CAMERA_MOVEMENT_THRESHOLD:
         d_pos /= l
         d_pos *= SPEED
+    if l_abs > CAMERA_MOVEMENT_THRESHOLD:
+        d_abs_pos /= l_abs
+        d_abs_pos *= SPEED
 
-        camera.move_camera(d_pos)
+    camera.move_camera(d_pos, d_abs_pos)
 
 def handle_mouse(window, keys: dict[int, bool], scene: Scene, input_scheme: InputScheme) -> None:
+    """
+    S'occupe de définir les actions à effectuer lorsqu'on bouge la souris et qu'on appuie sur ses boutons.
+    """
     camera = scene.get_camera()
     x,y = glfw.get_cursor_pos(window)
     d_eulers = CAM_SENSITIVITY * (WINDOW_WIDTH / 2 - x) * GLOBAL_Z * HORIZONTAL_INVERT
@@ -71,6 +88,9 @@ def handle_mouse(window, keys: dict[int, bool], scene: Scene, input_scheme: Inpu
 
 
 def start_game() -> None:
+    """
+    Fonction principale de ce script. Elle initialise la scène avec les objets et invoque l'application
+    """
     shader_manager = ShaderManager(FOV_Y, ASPECT_RATIO, NEAR_PLANE_CLIPPING, FAR_PLANE_CLIPPING)
     cube_shader = Shader("./core/shaders/vertex.glsl", "./core/shaders/fragment.glsl", False)
     cube_shader_id = shader_manager.append_shader(cube_shader)
@@ -98,7 +118,7 @@ def start_game() -> None:
 
     input_scheme = InputScheme("./core/controller/controls.cfg")
 
-    app = App(scene, input_scheme, handle_inputs)
+    app = App(scene, input_scheme, handle_inputs, WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_TITLE)
 
 if __name__ == "__main__":
     start_game()
