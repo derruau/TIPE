@@ -17,6 +17,8 @@ class Shader:
     """
     Un shader individuel
     """
+    __slots__ = ("_used_by", "_keep_in_memory", "vertex_path", "fragment_path", "shaders")
+
     def __init__(self, vertex_path: str, fragment_path:str, keep_in_memory: bool) -> None:
         """
         Si keep_in_memory = False, dès qu'aucune entitée n'utilise le shader, elle se fait détruire de la mémoire.
@@ -30,21 +32,33 @@ class Shader:
         self.shaders = None
 
     def init_shader(self) -> None:
+        """
+        A appeler une fois le shader créé.
+        """
         self.shaders = self.create_shader(self.vertex_path, self.fragment_path)
 
     def get_shaders(self):
+        """
+        Retourne l'objet shader.
+        """
         return self.shaders
     
-    def set_uniform(self, name: str, value: any) -> None:
+    def set_uniform(self, name: str, type: str, value: any) -> None:
         """
         TODO: A implémenter
         """
         pass
 
     def destroy(self) -> None:
+        """
+        Détruit le shader dans la VRAM.
+        """
         glDeleteProgram(self.shaders)
 
     def create_shader(self, vertexShaderPath: str, fragmentShaderPath: str):
+        """
+        Permet d'initialiser un vertex_shader et un fragment_shader pour les combiner en un objet shader.
+        """
         with open(vertexShaderPath, "r") as f:
             vertex_src = f.readlines()
         with open(fragmentShaderPath, "r") as f:
@@ -70,13 +84,27 @@ class Shader:
         pass
 
     def __repr__(self) -> str:
+        """
+        La représentation du shader lorsqu'on le print.
+        """
         return f'Shader: vertex_path: {self.vertex_path}, fragment_path: {self.fragment_path}'
 
 class ShaderManager:
     """
     Une classe qui contient tout les shaders initialisés dans le jeu
     """
-    def __init__(self, fov_y:float, aspect_ratio: float, near_clipping_plane: float, far_clipping_plane: float) -> None:
+    __slots__ = ("available_shaders_id", "shaders", "fov_y", "aspect_ratio", "near_clipping_plane", "far_clipping_plane")
+
+    def __init__(
+            self, 
+            fov_y:float, 
+            aspect_ratio: float, 
+            near_clipping_plane: float, 
+            far_clipping_plane: float
+            ) -> None:
+        """
+        Le ShaderManager s'occupe de gérer les différents shaders en mémoire.
+        """
         # Chaque nombre représente le nombre de shaders qui ont cette ID qui actuellement en cours d'utilisation
         self.available_shaders_id = {id: True for id in range(MAX_CONCURENT_SHADERS)}
         self.shaders: dict[int: Shader] = {}
@@ -174,6 +202,9 @@ class ShaderManager:
         shader._used_by -= 1
 
     def set_one_time_uniforms(self) -> None:
+        """
+        Initialise les uniformes à ne mettre qu'une seule fois. Telle que la caméra.
+        """
         projection = pyrr.matrix44.create_perspective_projection(
             self.fov_y,
             self.aspect_ratio,
@@ -191,6 +222,9 @@ class ShaderManager:
             )
     
     def set_projection_settings(self, fov_y: float, aspect_ratio: float, near_clipping_plane: float, far_clipping_plane: float) -> None:
+        """
+        Permet de re-paramétrer les paramètres de projection de la camera.
+        """
         self.fov_y = fov_y
         self.aspect_ratio = aspect_ratio
         self.near_clipping_plane = near_clipping_plane
@@ -203,6 +237,9 @@ class ShaderManager:
         return (self.fov_y, self.aspect_ratio, self.near_clipping_plane, self.far_clipping_plane)
 
     def set_material(self, shader_id: int, material: Material) -> None:
+        """
+        Donne à un shader le material à utiliser comme texture.
+        """
         if not self.is_id_in_use(shader_id):
             raise Exception("L'ID du shader n'est pas valable")
         shader = self.get_shaders()[shader_id]
@@ -213,6 +250,9 @@ class ShaderManager:
         )
 
     def set_view_matrix(self, view_matrix: pyrr.Matrix44) -> None:
+        """
+        Permet d'update la view_matrix sur tout les shaders du manager.
+        """
         for shader in self.get_shaders().values():
             glUseProgram(shader.get_shaders())
             glUniformMatrix4fv(

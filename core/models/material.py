@@ -7,8 +7,13 @@ from PIL import Image
 MAX_CONCURENT_MATERIALS = 128
 
 class Material:
-    def __init__(self, material_path: str, keep_in_memory: bool) -> None:
+    __slots__ = ("_used_by", "_keep_in_memory", "material_path", "texture")
 
+    def __init__(self, material_path: str, keep_in_memory: bool) -> None:
+        """
+        Initialise la classe. 
+        Si keep_in_memory = True, garde la texture en mémoire même si aucune mesh ne l'utilise
+        """
         self._used_by = 0
         self._keep_in_memory = keep_in_memory
 
@@ -18,6 +23,9 @@ class Material:
         
 
     def init_material(self):
+        """
+        Ouvre le fichier qui contient le material et l'initialise en VRAM
+        """
         # Dans le vocabulaire OpenGL, une texture est un conteneur qui contient 1 ou plusieurs images au même format
         self.texture = glGenTextures(1)
         # GL_TEXTURE_2D est une collection d'images à 2 dimensions
@@ -54,6 +62,8 @@ class Material:
         glDeleteTextures(1, (self.texture,))
 
 class MaterialManager:
+    __slots__ = ("available_material_id", "materials")
+
     def __init__(self) -> None:
         # Chaque nombre représente le nombre de materials qui ont cette ID qui actuellement en cours d'utilisation
         self.available_material_id = {id: True for id in range(MAX_CONCURENT_MATERIALS)}

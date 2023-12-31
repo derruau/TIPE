@@ -81,7 +81,7 @@ class Mesh:
     Dans le cas où on devrait avoir beaucoup de mesh en même temps, il faut privilégier une méthode avec moins de draw calls!!
     """
 
-    #__slots__ = ("vertex_count", "vao", "vbo", "filename", "_used_by", "_keep_in_memory")
+    __slots__ = ("vertex_count", "vao", "vbo", "filename", "_used_by", "_keep_in_memory")
 
     def __init__(self, filename: str, keep_in_memory: bool) -> None:
         self._used_by = 0
@@ -139,6 +139,9 @@ class Mesh:
         glDeleteBuffers(1, (self.vbo,))
 
 class MeshManager:
+    __slots__ = ("available_mesh_id", "meshes")
+
+
     def __init__(self) -> None:
         # Chaque nombre représente le nombre de mesh qui ont cette ID qui actuellement en cours d'utilisation
         self.available_mesh_id = {id: True for id in range(MAX_CONCURENT_MESHES)}

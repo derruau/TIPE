@@ -15,11 +15,17 @@ class Manager:
             material_manager: MaterialManager,
             mesh_manager: MeshManager
             ) -> None:
+        """
+        Initialise la classe Manager.
+        """
         self.shader_manager = shader_manager
         self.material_manager = material_manager
         self.mesh_manager = mesh_manager
 
     def init_managers(self) -> None:
+        """
+        Initialise toutes les ressources de tout les *managers.
+        """
         for shader in self.shader_manager.get_shaders().values():
             shader.init_shader()
         for mesh in self.mesh_manager.get_meshes().values():
@@ -36,6 +42,9 @@ class Manager:
         self.mesh_manager.clean()
 
     def destroy(self) -> None:
+        """
+        Détruit de la mémoire tout les
+        """
         self.shader_manager.destroy()
         self.material_manager.destroy()
         self.mesh_manager.destroy()
