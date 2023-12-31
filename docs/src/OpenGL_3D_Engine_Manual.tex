@@ -1,4 +1,4 @@
-\documentclass[a4paper,10pt]{article}
+\documentclass[a4paper,10pt]{report}
 %\documentclass[a4paper,10pt]{scrartcl}
 
 \usepackage[utf8]{inputenc}
@@ -6,6 +6,8 @@
 \usepackage{geometry}
 \usepackage{wrapfig}
 \usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{amsfonts}
 \graphicspath{ {./assets/} }
 \hypersetup{
     colorlinks=true,
@@ -20,27 +22,38 @@
  top=20mm,
  }
 
-\title{Le manuel d'utilisation de mon moteur de jeu}
+\title{TIPE simulation de fluide en temps réel}
 \author{DERRUAU Noam}
 \date{25/10/2023}
 
 \pdfinfo{%
-  /Title    (Le manuel d'utilisation de mon moteur de jeu)
+  /Title    (TIPE simulation de fluide en temps réel)
   /Author   (DERRUAU Noam)
 }
 
 \begin{document}
 \maketitle
 
+\vfill
+
+\begin{abstract}
+    Ce document décrit avec précision le travail que je présente dans le cadre de l'épreuve du TIPE 2023/2024 sur le thème 'Jeux et Sports'. Le point de départ de ma réflexion est venu d'une réalisation que l'on observe que très rarement des simulations de fluides interractives dans les jeux vidéos. Certes, dans beaucoup de jeux 'Open World', nous pouvons observer et même nager dans de grandes étendues d'eau, mais celles ci sont toujours statiques, ce sont des animations pré-rendues.\textbf{Le but de ce TIPE est de savoir quelles difficultés interviennent dans la réalisation d'une simulation de fluide newtonien incompréssible en temps réel}.
+
+    Pour ce faire, j'ai codé un moteur de jeu 3D rudimentaire qui a pour seul but de faire le rendu d'une simulation de fluide. J'explique en détail l'architecture du moteur de jeu, la théorie mathématique et physique derrière la simulation de fluide et les différentes approches que l'on peut avoir vis-à-vis de ce problème. Puisque ce travail a pour but de faire parti d'un jeu vidéo, nous négligerons le réalisme au profit des performances. Cependant, le résultat final doit quand même paraître crédible.
+\end{abstract}
+
+
 \newpage
 \tableofcontents
 \newpage
 
-\section{OpenGL}
+\chapter{Prérequis}
 
+\section{OpenGL et la programmation graphique}
+Pour comprendre le code de ce TIPE, il est nécessaire d'être familier avec OpenGL.
 \subsection{Qu'est ce qu'OpenGL?}
 
-OpenGL est une API graphique dont les fonctionnalités sont spécifiés (mais non codés) par le groupe \href{https://www.khronos.org/}{Khronos}. L'implémentation des fonctions est quand à elle laissée aux fabriquants de cartes graphiques (Nvidia, AMD, Intel, etc...). Les librairies utilisés en interne par l'ordinateur sont donc dépendentes de notre matériel.
+OpenGL est une API graphique dont les fonctionnalités sont spécifiés (mais non codés) par le groupe \href{https://www.khronos.org/}{Khronos}. L'implémentation des fonctions est quand à elle laissée aux fabriquants de cartes graphiques (Nvidia, AMD, Intel, etc...). Les librairies graphiques utilisés en interne par notre ordinateur sont donc dépendentes de notre matériel.
 Pour mon moteur de jeu, j'utiliserais OpenGL 3.3, aussi appelé Modern OpenGL
 \\
 \begin{wrapfigure}{r}{0.5\textwidth}
@@ -56,7 +69,7 @@ Pour bien comprendre l'API, il est essentiel d'être au point sur le mode de fon
 \subsubsection{La carte graphique}
 Une carte graphique est un composant de l'ordinateur, au même titre que le processeur, dont le but est de transformer des données graphiques envoyés par le processeur en une image cohérente sur un écran. Un processeur est capable d'accomplir cette tache sans l'aide d'une carte graphique, cependant l'opération est très lente et nécessite beaucoup d'optimisation pour tourner avec un nombre d'images par seconde acceptable.
 
-\paragraph{Différence entre un processeur et carte graphique}
+\paragraph{Différence entre un processeur et une carte graphique}
 \begin{wrapfigure}{l}{0.5\textwidth}
     \centering
     \includegraphics[width=0.5\textwidth]{parallel_computing_vs_sequential_computing}
@@ -93,14 +106,13 @@ Les programmes qui tournent sur la carte graphique sont appelés des shaders. Da
 Dans OpenGL, un buffer est une région continue de VRAM qui contient des informations non typés, par exemple cela veut dire qu'on ne dispose d'aucun moyen pour savoir si 01000001 représente le caractère A en ASCII où juste le nombre 65.
 Les buffers peuvent soient être mutables soit non-mutables. Ce qu'on veut dire par là, c'est que la taille des buffers et leurs emplacement mémoire n'est pas mutable, mais leur contenu lui l'est. Les buffers non-mutables ouvrent la porte à des optimisations, non détaillés ici.
 
-\newpage
 \subsubsection{Primitives}
 \label{subsubsec:Primitives}
 Les primitives sont les différents moyens de représenter une suite de points. On peut par exemple dire que la liste $(p_0, ..., p_n)$ représente juste des points de l'espace, mais aussi une suite de segments $[p_ip_{i+1}], \forall i \in  [\![0;n-1]\!]$ ou encore une liste de triangles dont les points $(p_i, p_{i+1}, p_{i+2}), \forall i \in  [\![0;n-2]\!]$ sont les sommets. Dans OpenGL, les primitives disponibles sont les suivantes:
 
 \includegraphics[width=0.96\textwidth]{OpenGL_primitives_flattened}
 
-Notez que les Quads ne sont plus disponibles puisque la surface que les points délimitée est ambiguë. En effet, si les 4 points ne sont pas dans le même plan, quels points font partie de la surface?
+Notez que les Quads/Polygons ne sont plus disponibles puisque la surface que les points délimitent est ambiguë. En effet, si les 4 points ne sont pas dans le même plan, quels points font partie de la surface?
 
 \subsubsection{Textures}
 [WORK IN PROGRESS]
@@ -118,6 +130,291 @@ Ce manuel n'est pas une documentation de la spécification OpenGL 3.3, aussi je 
 \end{itemize}
 
 
+\chapter{La théorie mathématique et physique}
+Dans tout ce chapitre, on se place en coordonnées cartésiennes.
+\section{Introduction à la mécanique des fluides}
+\subsection{Notion de particule de fluide et configuration d'un fluide}
+Une particule de fluide est un volume élémentaire $dV$ centré sur un point $M$ et de masse volumique $\rho$. Les dimensions du volume sont à \href{https://fr.wikipedia.org/wiki/Mésoscopique}{l'échelle mésoscopique}, c'est à dire que ce volume est assez petit pour pouvoir faire du calcul différentiel avec mais assez grand pour étudier le comportement moyen des propriétés des atomes contenus dans ce volume.
+À l'instant $t$, une particule de fluide est repérée par l'emplacement $M$ de son centre.
+
+Un fluide est donc défini comme un ensemble de particules de fluide occupant un volume $V$ de l'espace à l'instant $t$. Pour décrire les différentes grandeurs physiques qui caractérisent chaque particule de fluide, on utilisera la notion de champ : champ de vitesse, champ d'accélération, champ de masse volumique, champ de température, de pression, etc... Ces champs caractérisent la grandeur correspondante pour tout point du système étudié.
+
+\subsection{Les différents points de vue}
+Il existe 2 grandes écoles de pensée, ceux qui décrivent un fluide de manière Eulerienne et ceux qui décrivent un fluide de manière Lagrangienne. Prenons l'exemple d'une course de Formule 1. On peut assimiler un fluide à un ensemble de voitures qui se suivent, une seule voiture constituant une particule fluide. La configuration initiale serait la situation au départ de la course ; la configuration actuelle serait la situation à un instant donné de la course.
+
+Il faut décrire toute la course, i.e décrire le mouvement de toutes les voitures. Pour cela, deux solutions sont possibles. Soit on met une caméra sur chaque voiture (approche lagrangienne), soit on pose des caméras régulièrement le long de la piste (approche eulérienne). Si on a besoin d’identifier la voiture, dans le premier cas, on sait que la caméra x est sur la voiture qui est partie en xième position (mouvement rigide, approche lagrangienne). Dans le deuxième cas, il suffit de chercher devant quelle caméra passe la voiture (mouvement fluide, approche eulérienne).
+
+\subsubsection{Description Lagrangienne}
+Dans le cadre de la \href{https://fr.wikipedia.org/wiki/Description_lagrangienne}{description lagrangienne}, on suit une particule fluide dans son mouvement et on regarde sa position à un instant $t$, notée $M(t)$. Les inconnues de la description de lagrange sont les coordonnées $x$, $y$ et $z$ à l'instant $t$ d'une particule de fluide.
+$$\vec{OM}(t) = x(t)\vec{u_x} + y(t)\vec{u_y} + z(t)\vec{u_z}$$
+Pour avoir la vitesse et l'accélération, il suffit donc de dériver l'expression de $\vec{OM}$.
+
+\subsubsection{Description Eulerienne}
+Dans le cadre de la \href{https://fr.wikipedia.org/wiki/Description_eulérienne}{description eulerienne}, on considère un volume $d\tau$ fixe dans l'espace et on mesure la vitesse (ou une autre propriété) moyenne du fluide pour toutes les particules qui traversent cette région. L'inconnue de la description de euler est donc la vitesse $u(t)$ moyenne des particules de fluide dans ce volume.
+$$\vec{u}(t) = u_x(t)\vec{u_x} + u_y(t)\vec{u_y} + u_z(t)\vec{u_z}$$
+Pour avoir la position, on intègre cette expression, et pour avoir l'accélération on la dérive.
+On arrive à $\vec{a} = \frac{\partial \vec{u}}{\partial t} + \frac{\partial \vec{u}}{\partial x}\frac{\partial \vec{x}}{\partial t} + \frac{\partial \vec{u}}{\partial y}\frac{\partial \vec{y}}{\partial t} +\frac{\partial \vec{u}}{\partial z}\frac{\partial \vec{z}}{\partial t} = \boxed{ \frac{\partial \vec{u}}{\partial t} + \vec{\nabla}\vec{u}\cdot \vec{u} = \vec{a}}$
+\begin{center}
+ \includegraphics[width=0.5\textwidth]{eulerian_vs_lagrangian_description}
+\end{center}
+
+Au final dans les deux cas, on a bien définit le champs de position des particules, cependant avec Euler on doit traquer les particules qui rentrent/sortent de chacun des volumes et avec Lagrange on doit traquer la position des particules en elles même. Pour un programme informatique, la description Lagrangienne est à privilégier, mais pour l'étude théorique, on privilégie la description Eulerienne. Les deux nous mènent aux mêmes résultats.
+
+\section{Les equations de Navier-Stokes}
+Maintenant que nous comprenons un peu mieux les fluides, il est temps d'établir l'équation de leur mouvement. Pour cela, considérons une particule de fluide de position $M$ et de masse $m$ à laquelle on veut appliquer la 2eme loi de Newton. On distingue deux types de forces appliqués à cette particule:
+\begin{itemize}
+ \item Les forces de contact: les forces entre deux particules de fluides qui se touchent.
+ \item Les forces à distance: les forces issues du poids $\vec{P}$, de la force de Lorentz, etc...
+\end{itemize}
+
+La 2nde loi de newton s'écrit donc:
+\begin{align*}
+m \frac{d\vec{v}}{dt} &= \vec{F}_{contact} + \vec{F}_{distance}
+\end{align*}
+ On remarque que les forces à distances sont généralement définies volumiquement, c'est à dire que l'on peut factoriser un élément $d\tau$ à la force. Par exemple, le poids:
+ $$\vec{P} = m\vec{g} = \rho d\tau \vec{g}$$
+ On aimerait donc bien sortir un $d\tau$ de chacunes des forces pour pouvoir le simplifier dans la 2nde loi de Newton. Pour cela, il nous faut trouver un équivalent volumique de chacune d'entre elles.
+
+ \subsection{Les forces de contact}
+
+\begin{wrapfigure}{r}{0.4\textwidth}
+ \includegraphics[width=0.4\textwidth]{force_de_contact_particule_de_fluide}
+\end{wrapfigure}
+Pour un élément de surface $\vec{dS}$ de la particule de fluide, on peut définir une force infinitésimale de contact $d\vec{F}_{contact}$ décomposable comme ceci:
+$$d\vec{F}_{contact} = d\vec{F}_{tangentielle} + d\vec{F}_{normale}$$
+On nomme la composante tangentielle de la force de contact la \textbf{viscosité} et la composante normale la \textbf{pression}. Par convention, la composante normale est orientée sortant de la particule de fluide.
+% Pour éviter les collisions entre les 2 wrapfigure
+\\
+\\
+\\
+\newpage
+
+\subsubsection{Equivalent volumique de la force de pression}
+\begin{wrapfigure}{r}{0.2\textwidth}
+ \includegraphics[width=0.2\textwidth]{equivalent_force_de_pression_volumique}
+\end{wrapfigure}
+On considère un élément de volume $d\tau = dxdydz$. On note $P$ le champs de pression définit dans l'espace. La force de pression $dF_x$ exercée sur l'élément $d\tau$ sur l'axe $\vec{u_x}$ est définie de cette façon:
+\begin{align*}
+ dF_x &= P(x,y,z)dydz - P(x+dx, y, z)dydz \\
+           &= - (P(x+dx, y, z) - P(x, y, z))dydz \\
+           &= - \frac{\partial P}{\partial x} dxdydz \\
+           &= - \frac{\partial P}{\partial x} d\tau
+\end{align*}
+ En généralisant à 3 dimensions on obtient:
+$$ \boxed{\frac{\vec{dF_{pression}}}{d\tau} = - \vec{\text{grad}}P} $$
+\\
+\subsubsection{Equivalent volumique de la viscosité}
+
+\begin{wrapfigure}{l}{0.4\textwidth}
+ \includegraphics[width=0.4\textwidth]{ecoulement_couette_plan}
+  \caption{\href{https://fr.wikipedia.org/wiki/écoulement_de_Couette}{Écoulement couette plan}}
+\end{wrapfigure}
+Dans cette situation, on considère une lame de fluide de hauteur $h$. La couche du haut est une plaque solide qu'un opérateur tire à la vitesse $\vec{u_0}$. On remarque que pour chaque couche de fluide, la couche d'au dessus l'entraine et la couche du dessus la freine, ce qui crée une vitesse qui diminue linéairement avec la distance à la plaque. On a l'expression de la vitesse:
+$$ \vec{v} = v_x(y)\vec{u_x}$$
+Par aileurs: on définit la force de viscosité volumique par:
+$$ \vert \vec{V}dS \vert =\vert \frac{d \vec{F_{viscosite}}}{d S} \vert = \eta \vert \frac{\partial \vec{v}}{dy} \vert$$
+
+\begin{wrapfigure}{r}{0.2\textwidth}
+ \includegraphics[width=0.2\textwidth]{equivalent_force_de_viscosite_volumique}
+
+% \includegraphics[width=0.2\textwidth]{equivalent_force_de_viscosite_volumique}
+\end{wrapfigure}
+On peut donc faire le bilan de la force de viscosité $dF_x$ sur l'axe $u_x$ sur un petit élément $d\tau = dxdydz$
+\begin{align*}
+ dF_x &= \eta \frac{\partial v_x}{\partial y}(x, y, z + dz) dxdy - \eta \frac{\partial v_x}{\partial y}(x, y, z) dxdy \\
+      &= \eta (\frac{\partial v_x}{\partial y}(x, y, z + dz) - \frac{\partial v_x}{\partial y}(x, y, z)) dxdy \\
+      &= \eta \frac{\partial^2 v_x}{\partial y^2} ddydxdz \\
+      &= \eta \frac{\partial^2 v_x}{\partial y^2} d\tau
+\end{align*}
+\\
+En généralisant à 3 dimensions, on obtient:
+$$ \boxed{\frac{d\vec{F_{viscosite}}}{d\tau} = \eta \Delta \vec{v} }$$
+
+\newpage
+\subsection{Établissement de l'équation de Navier-Stokes}
+Maintenant que nous avons nos forces volumiques, il suffit de les mettre dans la 2nde loi de Newton:
+$$ \boxed{\rho \frac{d\vec{v}}{dt} = \rho \vec{g} - \vec{grad} P + \eta \Delta \vec{u} + \vec{F}}$$
+
+où $\vec{F}$ sont toutes les forces supplémentaires en dehors des actions de contact et du poids ($\rho \vec{g}$).
+Cette équation est valable pour un fluide incompréssible, c'est à dire un fluide où $\frac{d \rho}{dt} = 0$
+
+\subsubsection{Compléments à l'équation de Navier-Stokes - Equation de continuité}
+Une seconde équation peut être formulée pour les équations de Navier-Stokes. Celle ci vient du fait qu'un fluide obéit à la conservation de la masse. C'est à dire que le fluide ne peut spontanément être créé depuis une source ou spontanément détruit par un puit.
+\begin{center}
+ \includegraphics[width=0.8\textwidth]{equation_de_continuite_navier-stokes}
+\end{center}
+On arrive après quelques calculs à l'équation:
+$$ \frac{d \rho}{dt} + \rho \text{div } \vec{v} = 0$$
+Ce qui donne dans le cas d'un fluide incompréssible:
+$$ \boxed{\text{div } \vec{v} = 0} $$
+
+\vfill
+Pour résumer, les équations de Navier-Stokes sont:
+$$
+\boxed{\begin{cases}
+ \text{div } \vec{v} = 0 & \text{Equation de continuité où de conservation de la masse} \\
+ \rho (\frac{\partial \vec{u}}{\partial t} + \vec{\nabla}\vec{u}\cdot \vec{u} ) = \rho \vec{g} - \vec{grad} P + \eta \Delta \vec{u} + \vec{F} & \text{Equation de conservation de la quantité de mouvement}
+\end{cases}}
+$$
+\vfill
+\newpage
+
+\section{L'algorithme SPH}
+
+\subsection{Principe de l'algorithme}
+L'algorithme SPH, acronyme de '\href{https://en.wikipedia.org/wiki/Smoothed-particle_hydrodynamics}{Smoothed Particle Hydrodynamics}' vise à résoudre les équations de Navier-Stokes en considérant le fluide comme un ensemble discret de particules de fluide, chacune de rayon $r$ et de masse $m$. Ce point de vue offre de nombreux avantages puisque le nombre constant de particules de masse constante dans la simulation garantie le respect de l'équation de conservation de la masse.
+
+De plus, on peut rempalcer le terme $\frac{\partial \vec{u}}{\partial t} + \vec{\nabla}\vec{u}\cdot \vec{u}$ par $\frac{d \vec{u}}{dt}$. En effet, le terme $\frac{\vec{u}}{\partial t} + \vec{\nabla}\vec{u}\cdot \vec{u}$ est appelé le terme \href{https://fr.wikipedia.org/wiki/Advection}{d'advection}. C'est à dire qu'il correspond à la variation de la vitesse de la particule dûe au déplacement du fluide. Or comme les particules \textbf{sont} le fluide, ce terme est nul (je suis pas sûr de ma justification mais je crois les mots de \textit{Muller}). On se retrouve à devoir trouver des approximations discrètes des termes $\rho \vec{g}$, $\vec{grad} P$, $\eta \Delta \vec{u}$ et $\vec{F}$.
+
+Pour finir, comme les équations de Navier-Stokes sont générales pour les fluides, elles n'incluent pas la tension de surface. Nous devrons donc la modéliser et la représenter séparément.
+\subsection{Prérequis}
+\subsubsection{La pseudo-fonction de Dirac}
+La pseudo-fonction de Dirac est un objet mathématique qui possède ces propriétés:
+\begin{align*}
+ \delta(x) =
+\begin{cases}
+  + \infty & \text{si } x=0 \\
+  0 & \text{sinon}
+ \end{cases} \\
+ \int_{-\infty}^{+\infty} \delta(x)dx = 1
+\end{align*}
+
+Ce n'est pas une fonction mathématique usuelle, mais une \href{https://fr.wikipedia.org/wiki/Théorie_de_la_mesure}{mesure}.
+
+On définit usuellement cette pseudo-fonction comme limite d'une suite de fonctions. Par exemple soit
+$
+f_n(x) =
+\begin{cases}
+ n & \text{si } x\in [\frac{-1}{2n}, \frac{1}{2n}] \\
+ 0 & \text{sinon}
+\end{cases}
+$
+une suite de fonction CM et intégrable sur $\mathbb{R}$. On a bien $f_n \underset{s}{\to} \delta$ et
+\begin{align*}
+ \lim_{n\to +\infty} \int_{-\infty}^{+ \infty} f_n(x)dx &=\lim_{n\to +\infty} \int_{-\frac{1}{2n}}^{\frac{1}{2n}} ndx & \text{Changement de variable } u=2nx\\
+ &= \lim_{n\to +\infty} \int_{-1}^{1} \frac{1}{2}dx & \text{integration sur un segment: on peut rentrer la limite dans l'intégrale}\\
+ &= 1 &
+\end{align*}
+$\delta$ est bien limite de cette suite de fonctions.
+\\
+De plus, soit $g$ une fonction continue et intégrable sur $\mathbb{R}$.
+
+\begin{align*}
+ \int_\mathbb{R} g(x)\delta(x-t)dx &= \lim_{n \to +\infty} \int_{-\frac{1}{2n}}^{\frac{1}{2n}} g(x) n dx & \text{changement de variable } u=2n(x-t) \\
+ &= \lim_{n \to + \infty} \int_{-1}^1 f(t + \frac{u}{2n})\frac{1}{2}du \\
+ &= g(t)\int_{-1}^1 \frac{1}{2}du \\
+ &= g(t)
+\end{align*}
+
+On peut donc écrire cette identité pour le Dirac:
+$$\boxed{ \int_\mathbb{R} g(x)\delta(x-t)dx = g(t)}$$
+\newpage
+\subsubsection{Noyau de lissage}
+En statistique, pour extrapoler une fonction continue et lisse $\hat{f}_h$ (au sens des variations) à partir d'un échantillonnage de $n$ points $X_1, ... X_n$, on utilise la technique \href{https://fr.wikipedia.org/wiki/Estimation_par_noyau}{d'estimation par noyau}. On estime que:
+$$\hat{f}_h(x) = \frac{1}{nh} \sum_{i=1}^n K(\frac{x - x_i}{h})$$
+où
+\begin{itemize}
+ \item $h$ est le paramètre de lissage: plus il est grand, plus la fonction est lissée
+ \item $K$ est une fonction noyau de lissage. Elle assigne un 'poids de contribution' au point $x_i$ pour la valeur de la fonction $\hat{f}_h$ au point $x$ d'autant plus fort que $\frac{x - x_i}{h}$ est proche de 0. De plus $\underset{x\to \pm \infty}{\lim} K(x) = 0$
+\end{itemize}
+
+Pour être plus précis, on estime que la valeur d'une fonction en un point $x$ est environ égal à la moyenne des positions des points $X_i$ qui sont proches de $x$, ceux étant éloignés sont négligeables donc leur poids par la fonction $K$ est approximable à 0.
+\begin{figure}[h]
+\begin{center}
+ \includegraphics[width=0.8\textwidth]{kernel_smoother_graph}
+\end{center}
+ \caption{Explication intuitive de la fonction lissée}
+\end{figure}
+
+On pose $r= \lVert X - X_i \rVert$ la distance entre le point étudié $X$ et un point $X_i$.
+
+Les fonctions de lissage $K$ sont de la forme $K(r, h) = \frac{\sigma}{h^d}f(\frac{r}{h})$ où $d$ est le nombre de dimensions sur lequel on travail (3 dans notre cas) et $\sigma$ est un coefficient de normalisation. On pose $\mathbf{q = r/h}$. La fonction $K$ doit répondre à certains critères:
+\begin{align*}
+ & K \text{ positive, définie et décroissante} \\
+ & \lim_{h \to 0}K(r,h) = \delta(r) \\
+ & \sigma \int_\mathbb{R} f(q)dV = 1 & \text{où } dV = 4\pi q^2 dq \text{ en dimension 3}
+\end{align*}
+
+La première fonction à laquelle nous pouvons penser comme candidat de noyau de lissage est la fonction Gaussienne:
+$$K(r,h) = \frac{1}{\pi\sqrt{\pi} h^3}e^{-(r/h)^2}$$
+Cependant, nous n'utiliserons pas cette fonction à cause de son cout en temps pour un ordinateur . Il est préférable d'utiliser des polynomes plus rapides à calculer. De plus la fonction gaussienne n'est pas à support compact (i.e $\text{supp}(f) = \overline{\{x \in \mathbb{R}, f(x) \neq 0 \}}$ n'est pas un compact). C'est génant car lors de l'analyse mathématique, nous ne pouvons plus négliger les points loin en distance. Je propose donc d'utiliser la fonction suivante, où $\mathbf{q = r/h}$
+$$\boxed{
+K(r,h) = \frac{1}{\pi h^3}
+\begin{cases}
+ 1 - \frac{3}{2}q^2 + \frac{3}{4}q^3 & \text{si } 0 \le q < 1 \\
+ \frac{1}{4}(2-q)^3 & \text{si } 1 \le q < 2 \\
+ 0 & \text{si } q \ge 2
+\end{cases}}$$
+C'est un polynome à support compact de taille $2h$.
+
+\subsection{Approximation discrète de champs scalaire et de champs vectoriels}
+L'objectif de cette partie est d'obtenir l'approximation d'un champs scalaire/vectoriel continu sur l'espace en s'inspirant de la technique d'estimation par noyau.
+
+\subsubsection{Approximation pour un champs scalaire}
+Soit $A: \mathbb{R}^3 \to \mathbb{R}$ un champs scalaire.
+
+On part de l'identité du Dirac: $$A(M) = \int_{\mathbb{R}^3} A(M')\delta(\lVert M' - M\rVert)d^3M'$$.
+On pose similairement \\$$<A>(M) = \int_{\mathbb{R}^3} A(M')K(\lVert M' - M\rVert, h)d^3M'$$ où $K$ est une fonction lissage de noyau.
+On cherche à connaitre l'ordre de la différence (au sens du petit o) entre $A$ et $<A>$
+
+On pose $M' = \begin{pmatrix} M'_1 & M'_2 & M'_3\end{pmatrix}$
+Le développement en série de fourier de $A$ en $M$ dans $<A>$ donne:
+\begin{align*}% METTRE LES NORMES DANS LA FONCTION K!!! <--------
+ <A>(M) &= \int_{\mathbb{R}^3} \biggl [ A(M) + \nabla A(M) \cdot (M' - M) + \\ & \quad \frac{1}{2} \sum_{i,j = 1}^{3} (M'_i-M_i)(M'_j-M_j)\frac{\partial ^2 A}{\partial M'_i \partial M'_j}(M) + o(\lVert M - M'\rVert^2) \biggl] K(\lVert M - M'\rVert , h)dM' \\
+ &= A(M) +  \frac{\partial A}{\partial M}(M) \cdot \int_{\mathbb{R}^3} (M' - M) K(\lVert M' - M\rVert,h) dM' + ... + o(\lVert M - M'\rVert^2)
+\end{align*}
+
+On remarque que:
+$$ \int_{\mathbb{R}^3} (M' - M) K(\lVert M' - M\rVert,h) dM' \underset{U= M - M'}{=} \int_{\mathbb{R}^3}\underbrace{U^k K(\lVert U \rVert , h)}_\text{impaire}dU' = 0$$
+On commet donc au plus une erreur du second ordre. De plus par support compact on peut dire que:
+\begin{align*}
+ &\exists k \in \mathbb{N}, \lVert M' - M \rVert \le kh \\
+ &\implies \lVert M' - M \rVert^2 = O(h^2) \\
+ &\implies o(\lVert M' - M \rVert^2) = o(h^2)
+\end{align*}
+Ainsi on peut écrire:
+\begin{align*}
+A(M) &= \int_{\mathbb{R}^3} A(M')K(\lVert M' - M\rVert , h)dM' + o(h^2) \\
+    &= \int_{\mathbb{R}^3} \frac{A(M')}{\rho(M')}K(\lVert M' - M\rVert , h)\rho(M')dM' + O(h^2) & \text{On a } m(M') = \rho(M')dM'\\
+\end{align*}
+On peut alors discrétiser cette intégrale en utilisant le concept de l'intégrale de Riemann.
+$$
+\boxed{A(M) \approx \sum_i \frac{m_i}{\rho_i}A(M_i)K(\lVert M - M_i \rVert, h)}
+$$
+Cette approximation est d'autant plus bonne que le nombre de particule de fluide indicé par $i$ est élevé et dense dans un volume $V$.
+
+\newpage
+
+\subsubsection{Approximation du gradient d'un champs scalaire}
+\begin{align*}
+ \vec{\text{grad}}A(M) &= \frac{\partial}{\partial M}\int_{\mathbb{R}^3} A(M')\delta(\lVert M - M' \rVert)dM' \\
+      &= \frac{\partial}{\partial M}\left (\int_{\mathbb{R}^3} A(M') K(\lVert M - M' \rVert, h)dM' + o(h^2) \right) \\
+      &= \int_{\mathbb{R}^3} A(M')\frac{\partial K(\lVert M - M' \rVert, h)}{\partial M}dM' +o(h^2)\\
+\end{align*}
+En utilisant les mêmes arguments qu'à la partie précédente, on arrive à
+$$
+\boxed{ \vec{\text{grad}}(A)(M) \approx \sum_i \frac{m_i}{\rho_i}A(M_i) \frac{\partial}{\partial M} \biggl( K(\lVert M - M_i \rVert, h) \biggl ) }
+$$
+
+\subsubsection{Approximation de la divergence d'un champs vectoriel}
+Soit $B : \mathbb{R}^3 \to \mathbb{R}^3$ un champs vectoriel.
+
+L'identité du Dirac marche toujours avec un champs vectoriel. On peut donc reprendre le résultat  suivant:
+$$\vec{B}(M) = \int_{\mathbb{R}^3} \vec{B}(M')\delta(\lVert M - M' \rVert)dM'$$
+De là, on suit les mêmes étapes qu'aux deux paragraphes précédent pour arriver au résultat:
+$$
+\boxed{ \text{div}\vec{B}(M) \approx \sum_i \frac{m_i}{\rho_i}\vec{B}(M_i) \cdot \vec{\text{grad}} \biggl(K(\lVert M - M_i \rVert, h)\biggl) }
+$$
+
+\subsubsection{Approximation du Laplacien d'un champs scalaire}
+On arrive à:
+$$
+\boxed{ \Delta A (M) \approx \sum_i \frac{m_i}{\rho_i}A(M_i) \Delta \biggl(K(\lVert M - M_i \rVert, h)\biggl) }
+$$
+
+\subsection{Modélisation des différentes quantités}
+
+\chapter{Le moteur de jeu}
 \section{Structure du moteur de jeu}
 
 \subsection{But à accomplir}
