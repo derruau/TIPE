@@ -30,8 +30,8 @@ class Manager:
             shader.init_shader()
         for mesh in self.mesh_manager.get_meshes().values():
             mesh.init_mesh()
-        for material in self.material_manager.get_materials().values():
-            material.init_material()
+        for id, material in self.material_manager.get_materials().items():
+            material.init_material(id)
 
     def clean_unused_resources(self) -> None:
         """

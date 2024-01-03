@@ -236,17 +236,17 @@ class ShaderManager:
         """
         return (self.fov_y, self.aspect_ratio, self.near_clipping_plane, self.far_clipping_plane)
 
-    def set_material(self, shader_id: int, material: Material) -> None:
+    def set_material(self, shader_id: int, material_id: Material) -> None:
         """
         Donne à un shader le material à utiliser comme texture.
         """
         if not self.is_id_in_use(shader_id):
             raise Exception("L'ID du shader n'est pas valable")
-        shader = self.get_shaders()[shader_id]
-        glUseProgram(shader)
+        shader: Shader = self.get_shaders()[shader_id]
+        glUseProgram(shader.get_shaders())
         glUniform1i(
-            glGetUniformLocation(shader, "imageTexture"),
-            0
+            glGetUniformLocation(shader.get_shaders(), "imageTexture"),
+            material_id
         )
 
     def set_view_matrix(self, view_matrix: pyrr.Matrix44) -> None:

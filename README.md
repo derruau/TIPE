@@ -16,6 +16,10 @@ Appuyer sur 'échap' pour mettre en pause la simulation \
 Appuyer sur les flèches directionnelles de gauche et droite pour avancer/reculer étape par étape de la simulation \
 Note: les étapes de la simulation sont stockées dans un buffer temporaire, on peut revenir max 128 étapes en arrière \
 
+## Le plan pour faire le rendu des particules
+1. Créer une bounding box de simulation
+2. Les particules sont des points dans un VBO avec une velocitee et une couleur
+3. Demerde toi dans le shader
 
 ## Docs
 On utilise le design pattern 'model view controller'

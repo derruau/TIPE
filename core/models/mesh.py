@@ -75,18 +75,21 @@ class Mesh:
     """
     Une mesh (ou filet en français) est une collection de points qui définissent une forme.
     Pour instancier une mesh, il faut passer en argument le chemin d'un fichier .obj (très important) qu'on souhaite dessiner
+    
+    La variable `point_type` est le type d'information que représente la mesh: par exemple GL_TRIANGLES, GL_QUADS, GL_POINTS, etc...
     \n\n
     Remarque: ne pas instancier trop de mesh en même temps, car cette implémentation n'est pas très performante.
     En effet, à chaque fois qu'on veut dessiner une de ces mesh, il faut appeler les méthodes prepare_to_draw() et draw(), ce qui prends beaucoup de temps
     Dans le cas où on devrait avoir beaucoup de mesh en même temps, il faut privilégier une méthode avec moins de draw calls!!
     """
 
-    __slots__ = ("vertex_count", "vao", "vbo", "filename", "_used_by", "_keep_in_memory")
+    __slots__ = ("vertex_count", "vao", "vbo", "filename", "point_type", "_used_by", "_keep_in_memory")
 
-    def __init__(self, filename: str, keep_in_memory: bool) -> None:
+    def __init__(self, filename: str, point_type ,keep_in_memory: bool) -> None:
         self._used_by = 0
         self._keep_in_memory = keep_in_memory
         self.filename = filename
+        self.point_type = point_type
 
         # Définis dans self.init_material()
         self.vertex_count = None
@@ -129,7 +132,7 @@ class Mesh:
         Dessine la mesh à l'écran. 
         TOUJOURS appeler prepare_to_draw() avant cette fonction!!
         """
-        glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+        glDrawArrays(self.point_type, 0, self.vertex_count)
 
     def destroy(self) -> None:
         """

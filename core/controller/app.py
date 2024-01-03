@@ -155,6 +155,7 @@ class App:
             self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
             glfw.poll_events()
 
+            print(self.scene.get_camera().get_orientation())
             self.rendering_engine.render(self.delta)
 
             glfw.swap_buffers(self.window)

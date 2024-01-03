@@ -18,11 +18,11 @@ class Material:
         self._keep_in_memory = keep_in_memory
 
         self.material_path = material_path
-        # Définis dans self.init_material()
+        # Définit dans self.init_material()
         self.texture = None
         
 
-    def init_material(self):
+    def init_material(self, id: int):
         """
         Ouvre le fichier qui contient le material et l'initialise en VRAM
         """
@@ -30,6 +30,7 @@ class Material:
         self.texture = glGenTextures(1)
         # GL_TEXTURE_2D est une collection d'images à 2 dimensions
         # C'est à dire qu'elles ont une hauteur et une largeur non nulle, mais une profondeur nulle
+        glActiveTexture(GL_TEXTURE0 + id)
         glBindTexture(GL_TEXTURE_2D, self.texture)
 
         # Répéter la texture sur l'axe s (axe des abscisses) si la face est trop grande
@@ -47,12 +48,12 @@ class Material:
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image_width, image_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data)
         glGenerateMipmap(GL_TEXTURE_2D)
 
-    def use(self) -> None:
+    def use(self, id:int) -> None:
         """
         Permet de dire à OpenGL quelle texture utiliser lorsqu'il dessine une mesh
         À utiliser avant mesh.prepare_to_draw()
         """
-        glActiveTexture(GL_TEXTURE0)
+        glActiveTexture(GL_TEXTURE0 + id)
         glBindTexture(GL_TEXTURE_2D, self.texture)
 
     def destroy(self) -> None:

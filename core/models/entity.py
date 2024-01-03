@@ -8,6 +8,7 @@ import pyrr
 import numpy as np
 from typing import Callable, TypedDict, NotRequired
 
+PI = 3.14159
 
 DEFAULT_ENTITY_LABEL = "Entitée"
 # Définition des axes
@@ -103,7 +104,7 @@ class Entity:
             if "shader_id" in _keys:
                 self.has_shaders = True
                 self.shader_id = options.get("shader_id", None)
-            if "meterial_id" in _keys:
+            if "material_id" in _keys:
                 self.has_material = True
                 self.material_id = options.get("material_id", None)
         if "update" in _keys:
@@ -182,20 +183,20 @@ class Camera(Entity):
         """
         Met à jour le système de coordonnée local de la caméra
         """
+        phi = self.eulers[0]
         theta = self.eulers[1]
-        phi = self.eulers[2]
 
         # Le vecteur vers lequel la caméra pointe (convertion des coordonnées sphériques en cartésiennes)
         self.forward = np.array(
             [
                 np.sin(theta) * np.cos(phi),
+                np.cos(theta),
                 np.sin(theta) * np.sin(phi),
-                np.cos(theta)
             ],
         np.float32)
 
         # Le vecteur qui pointe vers la droite de la caméra par rapport à sa vue
-        self.right = np.cross(self.forward, GLOBAL_Z)
+        self.right = np.cross(self.forward, GLOBAL_Y)
 
         # Le vecteur qui pointe vers le haut de la caméra par rapport à sa vue
         self.up = np.cross(self.right, self.forward)
@@ -231,6 +232,18 @@ class Camera(Entity):
         """
         self.eulers += d_eulers.get_rad()
 
-        self.eulers[0] %= 6.28319 # 2*PI
-        self.eulers[1] = min(3, max(0.1, self.eulers[1])) # 0 ça représente le haut et 3 ~ 2*pi le bas
-        self.eulers[2] %= 6.28319 # 2*PI
+        self.eulers[0] %= 2*PI
+        self.eulers[1] = min(3, max(0.1, self.eulers[1])) # 0 ça représente le haut et 3 ~ pi le bas
+        self.eulers[2] %= 2*PI
+
+    def set_position(self, position: np.ndarray) -> None:
+        self.position = position
+
+    def set_orientation(self, euleurs: Eulers) -> None:
+        self.eulers = euleurs.get_rad()
+
+    def get_orientation(self) -> Eulers:
+        return self.eulers
+    
+    def get_position(self) -> np.ndarray:
+        return self.position

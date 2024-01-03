@@ -76,9 +76,11 @@ class RenderingEngine:
                         GL_FALSE,
                         entity.get_model_matrix()
                     )
-                if entity.has_material:
-                    material: Material = self.scene.manager.material_manager.get_materials()[entity.material_id]
-                    material.use()
+
+                    if entity.has_material:
+                        self.scene.manager.shader_manager.set_material(entity.shader_id, entity.material_id)
+                        material: Material = self.scene.manager.material_manager.get_materials()[entity.material_id]
+                        material.use(entity.material_id)
                 mesh: Mesh = self.scene.manager.mesh_manager.get_meshes()[entity.mesh_id]
                 mesh.prepare_to_draw()
                 mesh.draw()
