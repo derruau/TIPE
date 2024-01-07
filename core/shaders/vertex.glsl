@@ -1,10 +1,16 @@
-#version 330 core
+#version 450 core
 
 layout(location=0) in vec3 vertexPos;
 layout(location=1) in vec2 VertexTexCoord;
 
-uniform mat4 projection = mat4(1.0);
-uniform mat4 view = mat4(1.0);
+layout (binding = 3, std140) uniform Matrices
+{
+    mat4 projection;
+    mat4 view;
+};
+
+//uniform mat4 projection = mat4(1.0);
+//uniform mat4 view = mat4(1.0);
 uniform mat4 model = mat4(1.0);
 
 out vec2 fragmentTexCoord;

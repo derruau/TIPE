@@ -4,6 +4,7 @@ if TYPE_CHECKING:
     from core.models.material import MaterialManager
     from core.models.mesh import MeshManager
     from core.models.shader import ShaderManager
+    from fluid_simulation.area import Fluid
 
 class Manager:
     """
@@ -13,7 +14,8 @@ class Manager:
             self,
             shader_manager: ShaderManager,
             material_manager: MaterialManager,
-            mesh_manager: MeshManager
+            mesh_manager: MeshManager,
+            fluid: Fluid
             ) -> None:
         """
         Initialise la classe Manager.
@@ -21,11 +23,13 @@ class Manager:
         self.shader_manager = shader_manager
         self.material_manager = material_manager
         self.mesh_manager = mesh_manager
+        self.fluid = fluid
 
     def init_managers(self) -> None:
         """
         Initialise toutes les ressources de tout les *managers.
         """
+        self.fluid.init_fluid()
         for shader in self.shader_manager.get_shaders().values():
             shader.init_shader()
         for mesh in self.mesh_manager.get_meshes().values():

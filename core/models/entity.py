@@ -88,6 +88,7 @@ class Entity:
         scale: Le facteur d'échelle par rapport à chaque axe, par exemple scale[0] est l'échelle par rapport à l'axe x, etc... \\
         options: Les arguments optionnels associés à une entitée, par exemple une mesh, des shaders, un material, etc... 
         """
+        self.is_fluid = False
         self.label: str = DEFAULT_ENTITY_LABEL
         self.position = np.array(position, np.float32)
         self.eulers = rotation.get_rad()
@@ -156,6 +157,24 @@ class Entity:
         Comment apparait l'entitée lorsqu'on la print.
         """
         return f"{self.label}:\n - Position: {self.position} \n - Rotation: {self.eulers} \n - Echelle: {self.scale}"
+
+    def set_scale(self, scale: list[float]) -> None:
+        self.scale = np.array(scale, np.float32)
+
+    def get_scale(self) -> list[float]:
+        return self.scale.tolist()
+
+    def set_position(self, position: list[float]) -> None:
+        self.position = np.array(position, np.float32)
+
+    def get_position(self) -> list[float]:
+        return self.position.tolist()
+
+    def set_orientation(self, eulers: Eulers) -> None:
+        self.eulers = eulers
+
+    def get_orientation(self) -> Eulers:
+        return self.eulers
 
 
 class Camera(Entity):
@@ -247,3 +266,4 @@ class Camera(Entity):
     
     def get_position(self) -> np.ndarray:
         return self.position
+

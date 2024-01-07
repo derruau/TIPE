@@ -6,8 +6,21 @@ if TYPE_CHECKING:
 import pyrr
 import numpy as np
 from OpenGL.GL.shaders import compileProgram, compileShader
-from OpenGL.GL import GL_VERTEX_SHADER, GL_FRAGMENT_SHADER, glUseProgram, glGetUniformLocation, glUniformMatrix4fv, glUniform1i, glDeleteProgram, GL_FALSE
-
+from OpenGL.GL import (
+    GL_VERTEX_SHADER,
+    GL_FRAGMENT_SHADER, 
+    glUseProgram, 
+    glGetUniformLocation, 
+    glUniform1i, 
+    glDeleteProgram,
+    GL_COMPUTE_SHADER, 
+    glGenBuffers, 
+    glBindBuffer, 
+    glBufferData, 
+    glBindBufferBase,
+    GL_UNIFORM_BUFFER, 
+    GL_STREAM_DRAW
+)
 
 
 MAX_CONCURENT_SHADERS = 128
@@ -88,6 +101,7 @@ class Shader:
         La représentation du shader lorsqu'on le print.
         """
         return f'Shader: vertex_path: {self.vertex_path}, fragment_path: {self.fragment_path}'
+
 
 class ShaderManager:
     """
@@ -212,14 +226,10 @@ class ShaderManager:
             self.far_clipping_plane,
             np.float32
             )
-        for shader in self.get_shaders().values():
-            glUseProgram(shader.get_shaders())
-            glUniformMatrix4fv(
-                glGetUniformLocation(shader.get_shaders(), "projection"),
-                1,
-                GL_FALSE,
-                projection
-            )
+        buf = glGenBuffers(1)
+        glBindBuffer(GL_UNIFORM_BUFFER, buf)
+        glBufferData(GL_UNIFORM_BUFFER, projection.nbytes, projection, GL_STREAM_DRAW)
+        glBindBufferBase(GL_UNIFORM_BUFFER, 3, buf)
     
     def set_projection_settings(self, fov_y: float, aspect_ratio: float, near_clipping_plane: float, far_clipping_plane: float) -> None:
         """
@@ -253,11 +263,42 @@ class ShaderManager:
         """
         Permet d'update la view_matrix sur tout les shaders du manager.
         """
-        for shader in self.get_shaders().values():
-            glUseProgram(shader.get_shaders())
-            glUniformMatrix4fv(
-                glGetUniformLocation(shader.get_shaders(), "view"),
-                1,
-                GL_FALSE,
-                view_matrix
+        projection = pyrr.matrix44.create_perspective_projection(
+            self.fov_y,
+            self.aspect_ratio,
+            self.near_clipping_plane,
+            self.far_clipping_plane,
+            np.float32
             )
+        matrices = np.array([projection, view_matrix], dtype=np.float32)
+        buf = glGenBuffers(1)
+        glBindBuffer(GL_UNIFORM_BUFFER, buf)
+        glBufferData(GL_UNIFORM_BUFFER, matrices.nbytes, matrices, GL_STREAM_DRAW)
+        glBindBufferBase(GL_UNIFORM_BUFFER, 3, buf)
+        # for shader in self.get_shaders().values():
+        #     glUseProgram(shader.get_shaders())
+        #     glUniformMatrix4fv(
+        #         glGetUniformLocation(shader.get_shaders(), "view"),
+        #         1,
+        #         GL_FALSE,
+        #         view_matrix
+        #     )
+
+
+class ComputeShader:
+    def __init__(self, filename: str) -> None:
+        self.filename = filename
+        self.shader = None
+
+    def init_shader(self) -> None:
+        with open(self.filename, "r") as f:
+            compute_shader = f.readlines()
+        self.shader = compileProgram(compileShader(compute_shader, GL_COMPUTE_SHADER))
+
+    def get(self):
+        return self.shader
+    
+    def use(self):
+        if self.shader == None:
+            raise Exception(f"Le compute shader {self.filename} n'a pas été correctement initialisé!")
+        glUseProgram(self.shader)

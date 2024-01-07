@@ -9,6 +9,7 @@ from core.models.material import Material, MaterialManager
 from core.models.mesh import Mesh, MeshManager
 from core.models.shader import Shader, ShaderManager
 from core.view.scene import Scene
+from fluid_simulation.area import Fluid
 
 PI = 3.14159
 
@@ -23,7 +24,7 @@ GLOBAL_Z = np.array([0,0,1], dtype=np.float32)
 FOV_Y = 45.0
 ASPECT_RATIO = WINDOW_WIDTH / WINDOW_HEIGHT
 NEAR_PLANE_CLIPPING = 0.1
-FAR_PLANE_CLIPPING = 50.0
+FAR_PLANE_CLIPPING = 1000.0
 
 
 SPEED = 0.3
@@ -105,6 +106,8 @@ def start_game() -> None:
     cube_shader_id = shader_manager.append_shader(cube_shader)
     arrow_shader = Shader("./core/shaders/arrow_vertex.glsl", "./core/shaders/arrow_fragment.glsl", False)
     arrow_shader_id = shader_manager.append_shader(arrow_shader)
+    fluid_shader = Shader("./fluid_simulation/fluid_vertex.glsl", "./fluid_simulation/fluid_fragment.glsl", False)
+    fluid_shader_id = shader_manager.append_shader(fluid_shader)
 
     material_manager = MaterialManager()
     cube_material = Material("./assets/white_borders.png", False)
@@ -121,17 +124,18 @@ def start_game() -> None:
     plane_mesh_id = mesh_manager.append_mesh(plane_mesh)
 
     cube = Entity(
-        [0.0, 1.0, 0.0],
+        [0.0, 1.0, 3.0],
         Eulers(False, [0, 0, 0]), 
-        [1.0, 1.0, 1.0], 
+        [3, 1.0, 1.0], 
         mesh_id=cube_mesh_id, 
         shader_id=cube_shader_id, 
         material_id=cube_material_id
         )
+    cube.set_label("cube")
     
     arrow = Entity(
         GLOBAL_Y,
-        Eulers(False, [0, 0,0]),
+        Eulers(False, [0, 0, 0]),
         [1.0, 1.0, 1.0],
         mesh_id = arrow_mesh_id,
         shader_id = arrow_shader_id
@@ -145,13 +149,17 @@ def start_game() -> None:
         shader_id = cube_shader_id,
         material_id = orange_placeholder_id
     )
+
+    #fluid = Fluid(1, 100, 0, [2, 2, 2], [1, 1, 1], fluid_shader_id)
+    fluid = Fluid(2, 0.1, [5, 5, 5], [1, 1, 1])
     
-    manager = Manager(shader_manager, material_manager, mesh_manager)
+    manager = Manager(shader_manager, material_manager, mesh_manager, fluid)
     
     scene = Scene(manager, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_ANGLE)
     scene.append_entity(cube)
     scene.append_entity(arrow)
     scene.append_entity(plane)
+    scene.append_entity(fluid)
 
     input_scheme = InputScheme("./core/controller/controls.cfg")
 

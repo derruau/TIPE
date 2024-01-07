@@ -84,6 +84,8 @@ class RenderingEngine:
                 mesh: Mesh = self.scene.manager.mesh_manager.get_meshes()[entity.mesh_id]
                 mesh.prepare_to_draw()
                 mesh.draw()
+            if entity.is_fluid:
+                entity.draw(self.scene)
             entity.update(delta)
         glFlush()
 

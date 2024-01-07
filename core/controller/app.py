@@ -14,7 +14,7 @@ from OpenGL.GL.shaders import compileProgram, compileShader
 from core.view.rendering_engine import RenderingEngine
 
 class App:
-    __slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme", "scene", "rendering_engine", "delta")
+    __slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme", "scene", "rendering_engine", "delta", "last_frame")
 
     def __init__(
             self, 
@@ -49,6 +49,7 @@ class App:
         Cette fonction ne spawn pas la fenêtre!!
         """
         self.last_time = 0
+        self.last_frame = 0
         self.delta = 0
         self.frames_rendered = 0
         if not glfw.init():
@@ -67,8 +68,8 @@ class App:
         """
         Initialise la fenêtre et la config pour les inputs.
         """
-        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
-        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 6)
+        glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 4)
         glfw.window_hint(glfw.OPENGL_PROFILE,glfw.OPENGL_CORE_PROFILE)
         self.window = glfw.create_window(window_width, window_height, window_title, None, None)
 
@@ -80,6 +81,7 @@ class App:
         self.input_scheme = input_scheme
         self.handle_inputs = handle_inputs
         glfw.set_key_callback(self.window, self.keys_callback)
+        glfw.set_mouse_button_callback(self.window, self.mouse_callback)
         glfw.swap_interval(1)
         glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
 
@@ -91,6 +93,7 @@ class App:
         glEnable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        print("Version d'OpenGL:", glGetString(GL_VERSION).decode())
 
     def error_callback(self, error: int, description: str):
         """
@@ -131,13 +134,21 @@ class App:
             case glfw.RELEASE:
                 self.keys[key_name] = False
 
+    def mouse_callback(self, window, button: int, action: int, mods: int):
+        btn = "mouse_left" if button == 0 else "mouse_right"
+        match action:
+            case glfw.PRESS:
+                self.keys[btn] = True
+            case glfw.RELEASE:
+                self.keys[btn] = False
+
     def calculate_fps(self):
         """
         Calcule  et actualise le nombre de FPS toute les secondes.
         """
         current_time = glfw.get_time()
         delta_t = current_time - self.last_time
-        self.delta = delta_t
+        self.delta = current_time - self.last_frame
         if delta_t >=1:
             framerate = max(1, int(self.frames_rendered / delta_t))
             glfw.set_window_title(self.window, f"Tourne avec {framerate}fps")
@@ -145,6 +156,7 @@ class App:
             self.frames_rendered = -1
 
         self.frames_rendered += 1
+        self.last_frame = current_time
 
     def main_loop(self):
         """
@@ -154,8 +166,8 @@ class App:
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
             glfw.poll_events()
-
-            print(self.scene.get_camera().get_orientation())
+            
+            self.scene.get_entities()[1].set_scale([(np.cos((self.frames_rendered/30 - 1) ) + 1), 1.0, 1.0]) # Pour faire bouger le cube
             self.rendering_engine.render(self.delta)
 
             glfw.swap_buffers(self.window)
