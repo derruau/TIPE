@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from core.models.material import MaterialManager
     from core.models.mesh import MeshManager
     from core.models.shader import ShaderManager
-    from fluid_simulation.area import Fluid
+    from fluid_simulation.fluid import Fluid
 
 class Manager:
     """
@@ -29,13 +29,13 @@ class Manager:
         """
         Initialise toutes les ressources de tout les *managers.
         """
-        self.fluid.init_fluid()
         for shader in self.shader_manager.get_shaders().values():
             shader.init_shader()
         for mesh in self.mesh_manager.get_meshes().values():
             mesh.init_mesh()
         for id, material in self.material_manager.get_materials().items():
             material.init_material(id)
+        self.fluid.init_fluid(self.mesh_manager, self.material_manager, self.shader_manager)
 
     def clean_unused_resources(self) -> None:
         """

@@ -43,7 +43,7 @@ class App:
 
         self.main_loop()
 
-    def _init_glfw(self) -> void:
+    def _init_glfw(self) -> None:
         """
         Initialisation de glfw, ainsi que certaines variables de la classe.
         Cette fonction ne spawn pas la fenêtre!!
@@ -64,7 +64,7 @@ class App:
             window_height: int,
             window_width: int,
             window_title
-            ) -> void:
+            ) -> None:
         """
         Initialise la fenêtre et la config pour les inputs.
         """
@@ -162,6 +162,8 @@ class App:
         """
         La boucle principale du jeu. Elle invoque le rendering engine et events claviers et calcule les FPS
         """
+        width, height = glfw.get_window_size(self.window)
+        glfw.set_cursor_pos(self.window, width / 2, height / 2)
         while not glfw.window_should_close(self.window):
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
             self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)

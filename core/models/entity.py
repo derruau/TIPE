@@ -53,7 +53,12 @@ class Eulers:
         """
         Retourne l'angle en radians
         """
-        return self.eulers * 0.01745 if not self.is_rad else self.eulers
+        return (self.eulers * 0.01745).copy() if not self.is_rad else self.eulers.copy()
+
+    def __repr__(self) -> str:
+        if self.is_rad:
+            return f"rotation par rapport à \n - x: {self.get_rad()[0]} rad \n - y: {self.get_rad()[1]} rad \n - z: {self.get_rad()[2]} rad"
+        return f"rotation par rapport à \n - x: {self.get_degrees()[0]} ° \n - y: {self.get_degrees()[1]} ° \n - z: {self.get_degrees()[2]} °"
 
 
 class EntityOptions(TypedDict):
@@ -194,7 +199,8 @@ class Camera(Entity):
         eulers: (theta, phi). en coordonéées sphériques. theta représente l'orientation verticalle, et phi l'orientation horizontale
         """
 
-        super().__init__(position, Eulers(True, [0, 3.14159/2, 0]), [1.0, 1.0, 1.0])
+        super().__init__(position, eulers, [1.0, 1.0, 1.0])
+        
         self.update(0)
         self.set_label("Camera")
 
@@ -262,7 +268,7 @@ class Camera(Entity):
         self.eulers = euleurs.get_rad()
 
     def get_orientation(self) -> Eulers:
-        return self.eulers
+        return Eulers(True, self.eulers)
     
     def get_position(self) -> np.ndarray:
         return self.position

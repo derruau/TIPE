@@ -1,4 +1,5 @@
 glfw==2.6.2
+imgui==2.0.0
 multipledispatch==1.0.0
 numpy==1.26.1
 Pillow==10.1.0

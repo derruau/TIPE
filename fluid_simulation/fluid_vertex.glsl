@@ -6,6 +6,7 @@ struct Particle {
 };
 
 layout(location=0) in vec3 vertexPos;
+layout(location=2) in vec3 vertexNormal;
 
 
 layout (binding = 3, std140) uniform Matrices
@@ -25,7 +26,9 @@ layout(location = 4) uniform int readBuffer = 0;
 uniform float particleSize = 1;
 
 out vec2 fragmentTexCoord;
-out vec4 aColor;
+out vec3 fragmentNormal;
+out vec3 fragmentPosition;
+
 Particle p(int id) {
     if( readBuffer == 0) {
         return particles0[id];
@@ -39,15 +42,15 @@ void main() {
     float y = p(gl_InstanceID).position[1];
     float z = p(gl_InstanceID).position[2];
     
+    //Ne pas demander d'explication pour le *2, c'est juste comme ça 
     mat4 model = mat4(
-        particleSize, 0, 0, 0,
-        0, particleSize, 0, 0,
-        0, 0, particleSize, 0,
+        particleSize*2, 0, 0, 0,
+        0, particleSize*2, 0, 0,
+        0, 0, particleSize*2, 0,
         x, y, z, 1
     );
-    aColor = vec4(0, 0, particles0[gl_InstanceID].position.y, 1);
-    if (particles0[gl_InstanceID].position.y > 1) {
-        aColor = vec4(1, 0, 0, 1);
-    };
-    gl_Position = projection * view * model *  vec4(vertexPos, 1.0);
+    gl_Position = projection * view * model * vec4(vertexPos, 1.0);
+    //fragmentNormal = mat3(model) * vertexNormal;
+    fragmentNormal = mat3(model) * normalize(vertexPos);
+    fragmentPosition = (model * vec4(vertexPos, 1.0)).xyz;
 }

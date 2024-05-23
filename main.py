@@ -9,7 +9,7 @@ from core.models.material import Material, MaterialManager
 from core.models.mesh import Mesh, MeshManager
 from core.models.shader import Shader, ShaderManager
 from core.view.scene import Scene
-from fluid_simulation.area import Fluid
+from fluid_simulation.fluid import Fluid
 
 PI = 3.14159
 
@@ -33,7 +33,7 @@ VERTICAL_INVERT = -1
 HORIZONTAL_INVERT = -1
 CAMERA_MOVEMENT_THRESHOLD = 0.00001
 DEFAULT_CAMERA_POSITION = [0, 1, -10]
-DEFAULT_CAMERA_ANGLE = Eulers(False, [PI/2, PI/2, 0])
+DEFAULT_CAMERA_ANGLE = Eulers(True, [PI/2, PI/2, 0])
 
 def handle_inputs(window, keys: dict[int, bool], scene :Scene, input_scheme: InputScheme) -> None:
     """
@@ -42,6 +42,8 @@ def handle_inputs(window, keys: dict[int, bool], scene :Scene, input_scheme: Inp
     """
     handle_keys(window, keys, scene, input_scheme)
     handle_mouse(window, keys, scene, input_scheme)
+    #print(scene.get_camera().get_orientation())
+
 
 def handle_keys(window, keys: dict[int, bool], scene: Scene, input_scheme: InputScheme) -> None:
     """
@@ -151,14 +153,14 @@ def start_game() -> None:
     )
 
     #fluid = Fluid(1, 100, 0, [2, 2, 2], [1, 1, 1], fluid_shader_id)
-    fluid = Fluid(2, 0.1, [5, 5, 5], [1, 1, 1])
+    fluid = Fluid(1000, 0.45, [-2.5, -2.5, -2.5], [2.5, 2.5, 2.5])
     
     manager = Manager(shader_manager, material_manager, mesh_manager, fluid)
     
     scene = Scene(manager, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_ANGLE)
-    scene.append_entity(cube)
-    scene.append_entity(arrow)
-    scene.append_entity(plane)
+    #scene.append_entity(cube)
+    #scene.append_entity(arrow)
+    #scene.append_entity(plane)
     scene.append_entity(fluid)
 
     input_scheme = InputScheme("./core/controller/controls.cfg")

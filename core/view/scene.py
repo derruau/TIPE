@@ -49,6 +49,12 @@ class Scene:
         """
         return not self.available_entity_id[id]
 
+    def is_label_used(self, label: str) ->bool:
+        for e in self.entities:
+            if e.get_label() == label:
+                return True
+        return False
+
     def get_entities(self) -> dict[int: Entity]:
         """
         Renvoie le dictionnaire contenant toutes les entités, la clé est l'ID de l'entitée et la valeur l'entitée en elle même

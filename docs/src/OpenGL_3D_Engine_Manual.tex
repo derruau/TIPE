@@ -8,6 +8,8 @@
 \usepackage{hyperref}
 \usepackage{amsmath}
 \usepackage{amsfonts}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \graphicspath{ {./assets/} }
 \hypersetup{
     colorlinks=true,
@@ -54,7 +56,7 @@ Pour comprendre le code de ce TIPE, il est nécessaire d'être familier avec Ope
 \subsection{Qu'est ce qu'OpenGL?}
 
 OpenGL est une API graphique dont les fonctionnalités sont spécifiés (mais non codés) par le groupe \href{https://www.khronos.org/}{Khronos}. L'implémentation des fonctions est quand à elle laissée aux fabriquants de cartes graphiques (Nvidia, AMD, Intel, etc...). Les librairies graphiques utilisés en interne par notre ordinateur sont donc dépendentes de notre matériel.
-Pour mon moteur de jeu, j'utiliserais OpenGL 3.3, aussi appelé Modern OpenGL
+Pour mon moteur de jeu, j'utiliserais OpenGL 4.3, version où les {\it compute shaders} ont été introduits.
 \\
 \begin{wrapfigure}{r}{0.5\textwidth}
     \centering
@@ -121,7 +123,7 @@ Notez que les Quads/Polygons ne sont plus disponibles puisque la surface que les
 [WORK IN PROGRESS]
 
 \subsection{Plus de renseignements}
-Ce manuel n'est pas une documentation de la spécification OpenGL 3.3, aussi je ne détaillerais pas plus son fonctionnement. Pour approfondir vos connaissances, je conseille de lire les wikis suivants:
+Ce manuel n'est pas une documentation de la spécification OpenGL 4.3, aussi je ne détaillerais pas plus son fonctionnement. Pour approfondir vos connaissances, je conseille de lire les wikis suivants:
 \begin{itemize}
  \item \href{https://www.khronos.org/opengl/wiki/}{Le wiki OpenGL de Khronos}: il permet de comprendre les concepts spécifiques à la libraire et les différents systèmes interagissent entre eux.
  \item \href{http://www.hyzgame.org.cn/OpenGL/man3/bottom.php}{La référence des fonctions OpenGL 3.3}: Contient une liste exhaustive de toutes les fonctions d'OpenGL 3.3 ainsi que comment les utiliser.
@@ -301,7 +303,7 @@ De plus, soit $g$ une fonction continue et intégrable sur $\mathbb{R}$.
 
 \begin{align*}
  \int_\mathbb{R} g(x)\delta(x-t)dx &= \lim_{n \to +\infty} \int_{-\frac{1}{2n}}^{\frac{1}{2n}} g(x) n dx & \text{changement de variable } u=2n(x-t) \\
- &= \lim_{n \to + \infty} \int_{-1}^1 f(t + \frac{u}{2n})\frac{1}{2}du \\
+ &= \lim_{n \to + \infty} \int_{-1}^1 g(t + \frac{u}{2n})\frac{1}{2}du \\
  &= g(t)\int_{-1}^1 \frac{1}{2}du \\
  &= g(t)
 \end{align*}
@@ -387,13 +389,13 @@ Cette approximation est d'autant plus bonne que le nombre de particule de fluide
 
 \subsubsection{Approximation du gradient d'un champs scalaire}
 \begin{align*}
- \vec{\text{grad}}A(M) &= \frac{\partial}{\partial M}\int_{\mathbb{R}^3} A(M')\delta(\lVert M - M' \rVert)dM' \\
-      &= \frac{\partial}{\partial M}\left (\int_{\mathbb{R}^3} A(M') K(\lVert M - M' \rVert, h)dM' + o(h^2) \right) \\
-      &= \int_{\mathbb{R}^3} A(M')\frac{\partial K(\lVert M - M' \rVert, h)}{\partial M}dM' +o(h^2)\\
+ \vec{\text{grad}}A(M) &= \frac{\partial}{\partial M}\int_{\mathbb{R}^3} A(M')\delta(\lVert M - M' \rVert)dM' \vec{l} \\
+      &= \frac{\partial}{\partial M}\left (\int_{\mathbb{R}^3} A(M') K(\lVert M - M' \rVert, h)dM' + o(h^2) \right) \vec{l}\\
+      &= \int_{\mathbb{R}^3} A(M')\frac{\partial K(\lVert M - M' \rVert, h)}{\partial M}dM' +o(h^2) \vec{l}\\
 \end{align*}
 En utilisant les mêmes arguments qu'à la partie précédente, on arrive à
 $$
-\boxed{ \vec{\text{grad}}(A)(M) \approx \sum_i \frac{m_i}{\rho_i}A(M_i) \frac{\partial}{\partial M} \biggl( K(\lVert M - M_i \rVert, h) \biggl ) }
+\boxed{ \vec{\text{grad}}(A)(M) \approx \sum_i \frac{m_i}{\rho_i}A(M_i) \frac{\partial}{\partial M} \biggl( K(\lVert M - M_i \rVert, h) \biggl ) \vec{l}}
 $$
 
 \subsubsection{Approximation de la divergence d'un champs vectoriel}
@@ -413,7 +415,45 @@ $$
 $$
 
 \subsection{Modélisation des différentes quantités}
-[WORK IN PROGRESS]
+Maintenant que nous savons comment faire l'approximation de tout ces opérateurs, nous pouvons trouver une formule pour calculer chacuns des termes des équations de Navier Stokes. Nous rappelons qu'avec les simplifications du cadre de l'algorithme, l'équation de continuité (i.e: $\text{div } \vec{v} = 0$ ) est toujours vraie donc nous ne la traiterons pas. L'équation du mouvement s'écrit:
+$$
+\rho \frac{d\vec{v}}{dt} = \rho \vec{g} - \vec{\text{grad}} P + \eta \Delta \vec{v} + \vec{F}
+$$
+avec $\rho$ la densité au point $M$ de l'espace étudié à l'instant $t$ et $\eta$ la constante de viscosité.
+
+\subsubsection{Modélisation de la densité}
+Commmençons par modéliser la densité $\rho$. Par définition, la densité est un champs scalaire donc on peut utiliser l'approximation calculé précédemment, on a:
+
+\begin{align}
+ \rho(M,t) &= \sum_{i}\frac{m_i}{\rho(M_i, t)}\rho(M_i,t)K(||M - M_i||, h) \\
+ &= \sum_i m_i K(||M - M_i||, h)
+\end{align}
+
+\subsubsection{Modélisation du poids}
+Maintenant que la densité à été modélisée, nous n'avons aucun problème à modéliser le poids
+$$\vec{P}(M,t) = \rho(M,t)\vec{g}$$
+
+\subsubsection{Modélisation des forces de pression}
+L'application directe de la formule trouvé précédemment donne le résultat suivant:
+\begin{align}
+\vec{F_p}(M,t) = -\sum_i \frac{m_i}{\rho(M_i,t)} p(M_i,t) \frac{\partial }{\partial M}K(||M - M_i||, h)\vec{u_r}
+\end{align}
+
+Cette formule a plusieurs problèmes. Premièrement nous devons à l'avance connaître la pression aux positions des particules. Même si cela n'est pas très réaliste, nous considéreront que le fluide réponds au modèle du gaz parfait, ainsi nous pouvons écrire:
+$$p = \frac{nRT}{V} = \frac{mRT}{MV} = \frac{\rho RT}{M} = k\rho$$ où $k = \frac{RT}{M}$
+
+Pour des raisons de stabilité de la simulation, nous écrirons que
+$$p = k(\rho - \rho_0)$$ où $\rho_0 = \frac{\text{nombre de particules}}{\text{volume de la simulation}}$ est la densité du fluide au repos. Cette modification, suggérée par {\it Desbrun} ne change pas la valeur numérique de la force de pression puisqu'elle ne dépends que du gradient de la pression, cependant, elle améliore grandement la stabilité de la simulation.
+\\
+\\
+L'autre problème de la formule du gradient de la pression est qu'elle n'est pas symétrique! Pour aider à le comprendre, imaginons que la simulation n'ait que 2 particules. On essaie de calculer $\vec{F_p}(M_1,t)$ et $\vec{F_p}(M_2,t)$. Comme le gradient du noyau de lissage et nul lorsque $||M - M_i|| = 0$, on n'utilise que la pression en $M_1$ pour calculer la force de $M_2$ et que la pression de $M_2$ pour calculer la force de $M_1$.
+Une solution simple et rapide à calculer (parfait dans le cas du TIPE) proposée par {\it Muller} est de plutôt prendre la formule suivante:
+$$ \vec{F_p}(M,t) = -\sum_i m_i\frac{p(M,t) + p(M_i,t)}{2\rho(M_i,t)}\frac{\partial}{\partial M}K(||M - M_i||, h)\vec{u_r}$$
+
+\subsubsection{Modélisation des forces de viscosité}
+De la même manière que pour les forces de pression, les forces de viscosité ne donnent pas une expression symétrique. Nous utilisons là aussi une solution donné par {\it Muller} pour résoudre le problème:
+$$\vec{F_{v}}(M,t) = \eta \sum_i m_i \frac{v_i - v}{\rho(M_i,t)} \Delta K(||M - M_i||, h)$$
+où $v$ est la vitesse de la particule au point $M$.
 
 \chapter{Le moteur de jeu}
 \section{Structure du moteur de jeu}
@@ -442,5 +482,62 @@ On peut critiquer ce choix, notamment car une simulation de fluide en temps rée
 [WORK IN PROGRESS]
 
 \subsubsection{Le Rendering Engine}
+[WORK IN PROGRESS]
+
+\section{Implémentation des modélisations mathématiques}
+
+On pourrait très bien implémenter toutes les formules comme elles apparaissent dans la modélisation mathématique, or cela résulterait en un algorithme en $O(n^2)$ où $n$ est le nombre de particules puisque pour approximer les forces sur une particule on doit sommer sur toutes les autres particules de la simulation. Cet algorithme prendrait beaucoup trop de temps à calculer pour une application en temps réel.
+
+Ce problème se pose dans beaucoup de jeux vidéos basé sur la physique, pourtant, des jeux comme \href{https://fr.wikipedia.org/wiki/Crysis}{CRYSIS} sorti en 2007 arrivent à simuler des miliers d'objets physiques fluidement (voir \href{https://www.youtube.com/watch?v=YG5qDeWHNmk}{cette vidéo}). la quasi-totalité des méthodes permettant de réduire le temps d'exécution de ces algoritmes reposent sur l'idée qu'un objet n'agit généralement sur d'autres objets ne manière significative que s'ils sont proches de lui. On doit donc faire en sorte de n'itérer que sur les objets qui sont proches pour calculer la valeur de ses forces.
+\\
+\\
+Dans le cadre de notre TIPE, comme le noyau a un rayon d'action au delà duquel il devient nul, on doit faire en sorte de seulement prendre en compte les particules qui sont à une distance inférieur du rayon d'action.
+
+\subsection{Partitionnement de l'espace}
+\begin{wrapfigure}{r}{0.4\textwidth}
+ \includegraphics[width=0.4\textwidth]{big_uniform_grid_partitionning}
+\end{wrapfigure}
+Pour ce faire, nous allons \href{https://en.wikipedia.org/wiki/Space_partitioning}{partitionner l'espace}. C'est à dire que nous allons diviser l'espace et classer les objets de la simulation dans ces divisions selon leur position. Il existe une infinité de façons de diviser l'espace, mais celle que nous allons utiliser est le partitionnement en grille uniforme.
+
+Cette partition est optimale pour un fluide incompressible car au repos il va tendre à une densité homogène dans l'espace de simulation et ainsi il y aura le même nombre de particules dans chacune des divisions.
+
+Si le rayon d'action du noyau est de $R$, on choisit que la longueur du côté du cube de partitionnement soit aussi $R$. Cela permet de n'avoir à prendre en compte que les 8 cellules autour de la cellule où se trouve la particule sur laquelle on travaille.
+
+Par exemple dans le diagramme sur la droite, si on travaille sur la particule en rouge, les seules particules qui ont une chance d'influencer le mouvement de la rouge sont celles en vert.
+\\
+\\
+Dans les faits, pour améliorer les performances nous allons executer l'algorithme suivant à chaque nouvelle image:
+\begin{algorithm}
+\caption{Table de partition}
+\label{CHalgorithm}
+\begin{algorithmic}[1]
+\Procedure{UpdateSpatialLookup}{}
+\For{chaque point $p_i$ de la simulation}
+\State (cellX, cellY, cellZ) $\leftarrow$ convertir la position de $p_i$ en les coordonnées de la grille
+\State cellKey $\leftarrow$ Hachage(cellX, cellY, cellZ)
+\State spatialLookup[$p_i$] $\leftarrow$ ($p_i$, cellKey)
+\State startIndices[$p_i$] $\leftarrow +\infty$
+\EndFor
+
+\State Trier spatialLookup selon cellKey
+
+\For{chaque point $p_i$ de la simulation}
+\State key $\leftarrow$ spatialLookup[$p_i$].cellKey
+\If{$p_i=0$}
+\State keyPrev $\leftarrow +\infty$
+\Else
+\State keyPrev $\leftarrow$ spatialLookup[$p_i - 1$].cellKey
+\EndIf
+\If{key $\neq$ keyPrev}
+\State startIndices[key] $\leftarrow$ i
+\EndIf
+\EndFor
+
+\Return spatialLookup, startIndices
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+Cet algorithme renvoit deux tables, \textbf{spatialLookup} et \textbf{startIndices}
 
 \end{document}
