@@ -3,7 +3,7 @@
 layout(location=0) in vec3 vertexPos;
 layout(location=1) in vec2 VertexTexCoord;
 
-layout (binding = 3, std140) uniform Matrices
+layout (binding = 0, std140) uniform Matrices
 {
     mat4 projection;
     mat4 view;

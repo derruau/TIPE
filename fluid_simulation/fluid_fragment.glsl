@@ -1,26 +1,17 @@
 #version 460 core
 
+layout(binding=3, std430) buffer velocitiesBuffer { vec3 velocities[]; };
+
 uniform vec3 camPos;
 
 in vec3 fragmentNormal;
 in vec3 fragmentPosition;
 out vec4 color;
 
-struct Particle {
-    vec3 position;
-    vec3 speed;
-};
 
-vec3 lightPosition = vec3(0.0, 10.0, 10.0);
+vec3 lightPosition = vec3(0.0, -10.0, -10.0);
 vec3 lightColor = vec3(1.0, 1.0, 1.0);
 float lightStrength = 0.5;
-
-layout(binding = 1, std430) readonly buffer particlebuffer0 {
-    Particle particles0[];
-};
-layout(binding = 2, std430) readonly buffer particlebuffer1 {
-    Particle particles1[];
-};
 
 void main() {
     /*
@@ -33,7 +24,7 @@ void main() {
 
     vec3 lightDirectionToPixel = lightPosition - fragmentPosition;
     float dst = length(lightDirectionToPixel);
-    lightDirectionToPixel = (lightDirectionToPixel);
+    //lightDirectionToPixel = (lightDirectionToPixel);
     vec3 cameraDirectionToPixel = camPos - fragmentPosition;
     vec3 halfway = normalize(lightDirectionToPixel + cameraDirectionToPixel);
 

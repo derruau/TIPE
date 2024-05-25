@@ -229,7 +229,8 @@ class ShaderManager:
         buf = glGenBuffers(1)
         glBindBuffer(GL_UNIFORM_BUFFER, buf)
         glBufferData(GL_UNIFORM_BUFFER, projection.nbytes, projection, GL_STREAM_DRAW)
-        glBindBufferBase(GL_UNIFORM_BUFFER, 3, buf)
+        # Les matrices sont au points de binding 7
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, buf)
     
     def set_projection_settings(self, fov_y: float, aspect_ratio: float, near_clipping_plane: float, far_clipping_plane: float) -> None:
         """
@@ -274,7 +275,8 @@ class ShaderManager:
         buf = glGenBuffers(1)
         glBindBuffer(GL_UNIFORM_BUFFER, buf)
         glBufferData(GL_UNIFORM_BUFFER, matrices.nbytes, matrices, GL_STREAM_DRAW)
-        glBindBufferBase(GL_UNIFORM_BUFFER, 3, buf)
+        # Les matrices projection et view sont au binding 0
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, buf)
         # for shader in self.get_shaders().values():
         #     glUseProgram(shader.get_shaders())
         #     glUniformMatrix4fv(

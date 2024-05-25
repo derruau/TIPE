@@ -2,21 +2,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.view.scene import Scene
-    from core.shaders import ShaderManager
-    from core.controller.manager import Manager
     from core.models.material import MaterialManager
     from core.models.mesh import MeshManager
     from core.models.shader import ShaderManager
 
 import numpy as np
-import ctypes
 from core.view.scene import Scene 
-from core.models.entity import Entity, EntityOptions, Eulers
+from core.models.entity import Entity, Eulers
 from core.models.material import Material
-from core.models.mesh import Mesh, load_mesh
+from core.models.mesh import Mesh
 from core.models.shader import Shader, ComputeShader
 from OpenGL.GL import *
-from math import floor
+from math import floor, log2
 
 PARTICLEAREA_MESH = Mesh("./assets/cube.obj", GL_TRIANGLES, False)
 PARTICLEAREA_MATERIAL = Material("./assets/white_borders.png", False)
@@ -62,9 +59,18 @@ class Fluid(Entity):
         self.particlearea = None
         self.particlearea_initialized = False
 
+    def create_buffer(self, data: np.ndarray, binding_point: 1):
+        buffer = glGenBuffers(1)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
+        glNamedBufferStorage(buffer, data.nbytes, data, GL_DYNAMIC_STORAGE_BIT)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_point, buffer)
+        return buffer
+    
+    def dispatch_compute_shader(self):
+        pass
 
-    def init_fluid(self, mesh_manager: MeshManager, material_manager: MaterialManager, shader_manager: ShaderManager) -> None:
-        # Fragment et vertex shader
+    def init_fluid_shaders(self):
+        # Initialisation du fragment et vertex shader
         self.particle_shaders.init_shader()
         self.particle_mesh.init_mesh()
         glUseProgram(self.particle_shaders.get_shaders())
@@ -73,7 +79,7 @@ class Fluid(Entity):
             self.particle_size
         )
         
-        # Compute shader
+        # Initialisation du compute shader
         FLUIDPARTICLE_COMPUTE.init_shader()
         FLUIDPARTICLE_COMPUTE.use()
         glUniform3fv(
@@ -85,9 +91,9 @@ class Fluid(Entity):
             self.simulation_corner_2.tolist()
         )
 
-        # Cube qui sert de rebord à la simulation
-        particlearea_position = 0.5*(self.simulation_corner_1 + self.simulation_corner_2)
-        particlearea_scale = abs(self.simulation_corner_1 - self.simulation_corner_2)
+    def create_bounding_box(self, mesh_manager: MeshManager, material_manager: MaterialManager, shader_manager: ShaderManager):
+        position = 0.5*(self.simulation_corner_1 + self.simulation_corner_2)
+        scale = abs(self.simulation_corner_1 - self.simulation_corner_2)
 
         particlearea_mesh_id = mesh_manager.append_mesh(PARTICLEAREA_MESH)
         mesh_manager.get_meshes()[particlearea_mesh_id].init_mesh()
@@ -97,18 +103,20 @@ class Fluid(Entity):
         material_manager.get_materials()[particlearea_material_id].init_material(particlearea_material_id)
 
         self.particlearea = Entity(
-            particlearea_position.tolist(),
+            position.tolist(),
             Eulers(False, [0, 0, 0]), 
-            particlearea_scale.tolist(), 
+            scale.tolist(), 
             mesh_id=particlearea_mesh_id, 
             shader_id=particlearea_shader_id, 
             material_id=particlearea_material_id
         )
         self.particlearea.set_label(PARTICLEAREA_LABEL)
+        return position, scale
 
-        max_particles_x = floor(particlearea_scale[0]/((self.particle_size + FLUIDPARTICLE_PADDING)))
-        max_particles_y = floor(particlearea_scale[1]/((self.particle_size + FLUIDPARTICLE_PADDING)))
-        max_particles_z = floor(particlearea_scale[2]/((self.particle_size + FLUIDPARTICLE_PADDING)))
+    def create_initial_particle_positions(self, position, scale):
+        max_particles_x = floor(scale[0]/((self.particle_size + FLUIDPARTICLE_PADDING)))
+        max_particles_y = floor(scale[1]/((self.particle_size + FLUIDPARTICLE_PADDING)))
+        max_particles_z = floor(scale[2]/((self.particle_size + FLUIDPARTICLE_PADDING)))
         max_particles = max_particles_x * max_particles_y * max_particles_z
         if self.particle_count > max_particles:
             print(f"Trop de particules dans la zone de simulation, le nombre de particule est donc réduit au maximum: {max_particles}")
@@ -116,26 +124,37 @@ class Fluid(Entity):
 
         data = []
         for i in range(self.particle_count):
-            px = particlearea_position[0] + particlearea_scale[0] - self.particle_size - (i % max_particles_x)*(2*self.particle_size + FLUIDPARTICLE_PADDING)
-            py = particlearea_position[1] + particlearea_scale[1] - self.particle_size - (floor(i/max_particles_x)% max_particles_y) *(2*self.particle_size + FLUIDPARTICLE_PADDING)
-            pz = particlearea_position[2] + particlearea_scale[2] - self.particle_size - floor(i/(max_particles_x*max_particles_y))*(2*self.particle_size + FLUIDPARTICLE_PADDING)
+            px = position[0] + scale[0] - self.particle_size - (i % max_particles_x)*(2*self.particle_size + FLUIDPARTICLE_PADDING)
+            py = position[1] + scale[1] - self.particle_size - (floor(i/max_particles_x)% max_particles_y) *(2*self.particle_size + FLUIDPARTICLE_PADDING)
+            pz = position[2] + scale[2] - self.particle_size - floor(i/(max_particles_x*max_particles_y))*(2*self.particle_size + FLUIDPARTICLE_PADDING)
             data.extend([
                 px, py, pz, # Position
-                0, # padding
-                0,0,0, # vitesse
-                0 # padding
+                0#, # padding
+                # 0,0,0, # vitesse
+                # 0 # padding
                 ])
         data.pop(-1)
-        initial_fluid_data = np.array(data, dtype=np.float32)
+        return np.array(data, dtype=np.float32)
 
-        self.particles_data_buffers = glGenBuffers(2)
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.particles_data_buffers[0])
-        glNamedBufferStorage(self.particles_data_buffers[0], initial_fluid_data.nbytes, initial_fluid_data, GL_DYNAMIC_STORAGE_BIT)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, self.particles_data_buffers[0])
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.particles_data_buffers[1])
-        glNamedBufferStorage(self.particles_data_buffers[1], initial_fluid_data.nbytes, initial_fluid_data, GL_DYNAMIC_STORAGE_BIT)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, self.particles_data_buffers[1])
-    
+    def init_fluid(self, mesh_manager: MeshManager, material_manager: MaterialManager, shader_manager: ShaderManager) -> None:
+        self.init_fluid_shaders()
+
+        position, scale = self.create_bounding_box(mesh_manager, material_manager, shader_manager)
+
+        initial_positions = self.create_initial_particle_positions(position, scale)
+
+        # Creation du buffer positions
+        self.create_buffer(initial_positions, 1)
+        # Création du buffer predictedPositions
+        self.create_buffer(initial_positions, 2)
+        # Création du buffer velocities
+        self.create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 3)
+        # Creation du buffer Densities
+        self.create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 4)
+        # Création du buffer SpatialIndices
+        self.create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 5)
+        # Création du buffer SpatialOffsets
+        self.create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 6)
 
     def draw(self, scene: Scene):
         particlearea_material: Material = scene.manager.material_manager.get_materials()[self.particlearea.material_id]
@@ -172,3 +191,54 @@ class Fluid(Entity):
         )
         glDispatchCompute(self.particle_count, 1, 1)
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+
+
+class GPUSort:
+    def __init__(self, index_buffer_size: int) -> None:
+        self.buffer_size = index_buffer_size
+        self.sort_shader = ComputeShader("./fluid_simulation/gpu_sort.glsl")
+        self.offset_shader = ComputeShader("./fluid_simulation/gpu_sort_offset.glsl")
+
+        self.sort_shader.init_shader()
+        self.offset_shader.init_shader()
+
+        self.numEntries_location = glGetUniformLocation(self.sort_shader.get(), "numEntries")
+        self.groupWidth_location = glGetUniformLocation(self.sort_shader.get(), "groupWidth")
+        self.groupHeight_location = glGetUniformLocation(self.sort_shader.get(), "groupHeight")
+        self.stepIndex_location = glGetUniformLocation(self.sort_shader.get(), "stepIndex")
+
+    def next_power_of_2(self, x):  
+        return 1 if x == 0 else 2**(x - 1).bit_length()
+
+
+    def sort(self):
+        self.sort_shader.use()
+        glUniform1i(self.numEntries_location, self.buffer_size)
+        
+        num_stages = log2(self.next_power_of_2(self.buffer_size))
+
+        for stage_index in range(num_stages):
+            for step_index in range(stage_index + 1):
+                # Même chose que 2**(stage_index - step_index) mais beaucoup plus rapide
+                groupWidth = 1 << (stage_index - step_index)
+                groupHeigth = 2* groupWidth - 1
+                glUniform1i(self.groupWidth_location, groupWidth)
+                glUniform1i(self.groupHeight_location, groupHeigth)
+                glUniform1i(self.stepIndex_location, step_index)
+
+                glDispatchCompute(self.next_power_of_2(self.buffer_size) // 2, 1, 1)                
+
+
+    def sort_and_calculate_offsets(self):
+        self.sort()
+
+        self.offset_shader.use()
+        glUniform1i(
+            glGetUniformLocation(self.offset_shader.get(), "numEntries"), self.buffer_size
+        )
+
+        glDispatchCompute(self.buffer_size, 1, 1)
+
+
+
+
