@@ -1,13 +1,8 @@
 import numpy as np
 import glfw
-from OpenGL.GL import GL_POINTS, GL_TRIANGLES, GL_QUADS, GL_LINE
 from core.controller.controls import InputScheme
 from core.controller.app import App
-from core.controller.manager import Manager
-from core.models.entity import Entity, Eulers
-from core.models.material import Material, MaterialManager
-from core.models.mesh import Mesh, MeshManager
-from core.models.shader import Shader, ShaderManager
+from core.models.entity import Eulers
 from core.view.scene import Scene
 from fluid_simulation.fluid import Fluid
 
@@ -103,69 +98,17 @@ def start_game() -> None:
     """
     Fonction principale de ce script. Elle initialise la scène avec les objets et invoque l'application
     """
-    shader_manager = ShaderManager(FOV_Y, ASPECT_RATIO, NEAR_PLANE_CLIPPING, FAR_PLANE_CLIPPING)
-    cube_shader = Shader("./core/shaders/vertex.glsl", "./core/shaders/fragment.glsl", False)
-    cube_shader_id = shader_manager.append_shader(cube_shader)
-    arrow_shader = Shader("./core/shaders/arrow_vertex.glsl", "./core/shaders/arrow_fragment.glsl", False)
-    arrow_shader_id = shader_manager.append_shader(arrow_shader)
-    fluid_shader = Shader("./fluid_simulation/fluid_vertex.glsl", "./fluid_simulation/fluid_fragment.glsl", False)
-    fluid_shader_id = shader_manager.append_shader(fluid_shader)
+    input_scheme = InputScheme("./core/controller/controls.cfg")
+    app = App(input_scheme, handle_inputs, WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_TITLE)
 
-    material_manager = MaterialManager()
-    cube_material = Material("./assets/white_borders.png", False)
-    cube_material_id = material_manager.append_material(cube_material)
-    orange_placeholder = Material("./assets/orange_placeholder.png", False)
-    orange_placeholder_id = material_manager.append_material(orange_placeholder)
+    scene = Scene(FOV_Y, ASPECT_RATIO, NEAR_PLANE_CLIPPING, FAR_PLANE_CLIPPING, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_ANGLE)
 
-    mesh_manager = MeshManager()
-    cube_mesh = Mesh("./assets/cube.obj", GL_TRIANGLES,False)
-    cube_mesh_id = mesh_manager.append_mesh(cube_mesh)
-    arrow_mesh = Mesh("./assets/arrow.obj", GL_TRIANGLES, False)
-    arrow_mesh_id = mesh_manager.append_mesh(arrow_mesh)
-    plane_mesh = Mesh("./assets/plane.obj", GL_TRIANGLES, False)
-    plane_mesh_id = mesh_manager.append_mesh(plane_mesh)
-
-    cube = Entity(
-        [0.0, 1.0, 3.0],
-        Eulers(False, [0, 0, 0]), 
-        [3, 1.0, 1.0], 
-        mesh_id=cube_mesh_id, 
-        shader_id=cube_shader_id, 
-        material_id=cube_material_id
-        )
-    cube.set_label("cube")
-    
-    arrow = Entity(
-        GLOBAL_Y,
-        Eulers(False, [0, 0, 0]),
-        [1.0, 1.0, 1.0],
-        mesh_id = arrow_mesh_id,
-        shader_id = arrow_shader_id
-    )
-
-    plane = Entity(
-        [0, 0, 0],
-        Eulers(False, [0, 0, 0]),
-        [100, 1, 100],
-        mesh_id = plane_mesh_id,
-        shader_id = cube_shader_id,
-        material_id = orange_placeholder_id
-    )
-
-    #fluid = Fluid(1, 100, 0, [2, 2, 2], [1, 1, 1], fluid_shader_id)
     fluid = Fluid(1000, 0.45, [-2.5, -2.5, -2.5], [2.5, 2.5, 2.5])
-    
-    manager = Manager(shader_manager, material_manager, mesh_manager, fluid)
-    
-    scene = Scene(manager, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_ANGLE)
-    #scene.append_entity(cube)
-    #scene.append_entity(arrow)
-    #scene.append_entity(plane)
     scene.append_entity(fluid)
 
-    input_scheme = InputScheme("./core/controller/controls.cfg")
+    app.set_scene(scene)
 
-    app = App(scene, input_scheme, handle_inputs, WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_TITLE)
+    app.start()
 
 if __name__ == "__main__":
     start_game()

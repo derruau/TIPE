@@ -5,25 +5,40 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.models.entity import Entity, Eulers
-    from core.controller.manager import Manager
-    from core.models.shader import Shader
-    from core.models.mesh import Mesh
-    from core.models.material import Material
 
+import pyrr
+import numpy as np
 from core.models.entity import Camera
+from OpenGL.GL import (
+    glGenBuffers,
+    glBindBuffer,
+    GL_UNIFORM_BUFFER,
+    glBufferData,
+    GL_STREAM_DRAW,
+    glBindBufferBase
+)
+
 
 MAX_SCENE_ENTITIES = 128
 
 class Scene:
     def __init__(
             self,
-            manager: Manager,
+            fov_y: float,
+            aspect_ratio: float,
+            near_plane_clipping: float,
+            far_plane_clipping :float,
             cam_pos: list[float],
             cam_eulers: Eulers
         ) -> None:
+        self.fov_y = fov_y
+        self.aspect_ratio = aspect_ratio
+        self.near_clipping_plane = near_plane_clipping
+        self.far_clipping_plane = far_plane_clipping
+
         self.available_entity_id = {id: True for id in range(MAX_SCENE_ENTITIES)}
         self.entities: dict[int: Entity] = {}
-        self.manager = manager
+
 
         cam = Camera(cam_pos, cam_eulers)
         self.cam_id = self.append_entity(cam)
@@ -71,12 +86,17 @@ class Scene:
         
         self.available_entity_id[id] = False
         self.entities[id] = entity
-        if entity.has_mesh:
-            self.manager.mesh_manager.add_mesh_use(entity.mesh_id)
-        if entity.has_material:
-            self.manager.material_manager.add_material_use(entity.material_id)
-        if entity.has_shaders:
-            self.manager.shader_manager.add_shader_use(entity.shader_id)
+
+        init_method = getattr(entity, "mounted", None)
+        if callable(init_method):
+            entity.mounted(self)
+
+        # if entity.has_mesh:
+        #     self.manager.mesh_manager.add_mesh_use(entity.mesh_id)
+        # if entity.has_material:
+        #     self.manager.material_manager.add_material_use(entity.material_id)
+        # if entity.has_shaders:
+        #     self.manager.shader_manager.add_shader_use(entity.shader_id)
 
         return id
 
@@ -89,12 +109,7 @@ class Scene:
             return False
 
         entity: Entity = self.entities[id]
-        if entity.has_mesh:
-            self.manager.mesh_manager.remove_mesh_use(entity.mesh_id)
-        if entity.has_material:
-            self.manager.material_manager.remove_material_use(entity.material_id)
-        if entity.has_shaders:
-            self.manager.shader_manager.remove_shader_use(entity.shader_id)
+        entity.destroy()
         del entity
         self.available_entity_id[id] = True
         
@@ -122,3 +137,53 @@ class Scene:
         Retourne la caméra de la scène
         """
         return self.get_entities()[self.cam_id]
+
+    def set_one_time_uniforms(self) -> None:
+        """
+        Initialise les uniformes à ne mettre qu'une seule fois. Telle que la caméra.
+        """
+        projection = pyrr.matrix44.create_perspective_projection(
+            self.fov_y,
+            self.aspect_ratio,
+            self.near_clipping_plane,
+            self.far_clipping_plane,
+            np.float32
+            )
+        buf = glGenBuffers(1)
+        glBindBuffer(GL_UNIFORM_BUFFER, buf)
+        glBufferData(GL_UNIFORM_BUFFER, projection.nbytes, projection, GL_STREAM_DRAW)
+        # Les matrices sont au points de binding 7
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, buf)
+
+    def set_projection_settings(self, fov_y: float, aspect_ratio: float, near_clipping_plane: float, far_clipping_plane: float) -> None:
+        """
+        Permet de re-paramétrer les paramètres de projection de la camera.
+        """
+        self.fov_y = fov_y
+        self.aspect_ratio = aspect_ratio
+        self.near_clipping_plane = near_clipping_plane
+        self.far_clipping_plane = far_clipping_plane
+    
+    def get_projection_settings(self) -> tuple:
+        """
+        Retourne le tuple suivant: (fov_y, aspect_ratio, near_clipping_plane, far_clipping_plane)
+        """
+        return (self.fov_y, self.aspect_ratio, self.near_clipping_plane, self.far_clipping_plane)
+
+    def set_view_matrix(self, view_matrix: pyrr.Matrix44) -> None:
+        """
+        Permet d'update la view_matrix sur tout les shaders du manager.
+        """
+        projection = pyrr.matrix44.create_perspective_projection(
+            self.fov_y,
+            self.aspect_ratio,
+            self.near_clipping_plane,
+            self.far_clipping_plane,
+            np.float32
+            )
+        matrices = np.array([projection, view_matrix], dtype=np.float32)
+        buf = glGenBuffers(1)
+        glBindBuffer(GL_UNIFORM_BUFFER, buf)
+        glBufferData(GL_UNIFORM_BUFFER, matrices.nbytes, matrices, GL_STREAM_DRAW)
+        # Les matrices projection et view sont au binding 0
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, buf)

@@ -2,9 +2,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.view.scene import Scene
-    from core.models.material import MaterialManager
-    from core.models.mesh import MeshManager
-    from core.models.shader import ShaderManager
 
 import numpy as np
 from core.view.scene import Scene 
@@ -79,26 +76,29 @@ class Fluid(Entity):
         FLUIDPARTICLE_COMPUTE.set_vec3("sim_corner_1", self.simulation_corner_1)
         FLUIDPARTICLE_COMPUTE.set_vec3("sim_corner_2", self.simulation_corner_2)
 
-    def create_bounding_box(self, mesh_manager: MeshManager, material_manager: MaterialManager, shader_manager: ShaderManager):
+    def create_bounding_box(self, scene: Scene):
         position = 0.5*(self.simulation_corner_1 + self.simulation_corner_2)
         scale = abs(self.simulation_corner_1 - self.simulation_corner_2)
 
-        particlearea_mesh_id = mesh_manager.append_mesh(PARTICLEAREA_MESH)
-        mesh_manager.get_meshes()[particlearea_mesh_id].init_mesh()
-        particlearea_shader_id = shader_manager.append_shader(PARTICLEAREA_SHADERS)
-        shader_manager.get_shaders()[particlearea_shader_id].init_shader()
-        particlearea_material_id = material_manager.append_material(PARTICLEAREA_MATERIAL)
-        material_manager.get_materials()[particlearea_material_id].init_material(particlearea_material_id)
+        # particlearea_mesh_id = mesh_manager.append_mesh(PARTICLEAREA_MESH)
+        # mesh_manager.get_meshes()[particlearea_mesh_id].init_mesh()
+        # particlearea_shader_id = shader_manager.append_shader(PARTICLEAREA_SHADERS)
+        # shader_manager.get_shaders()[particlearea_shader_id].init_shader()
+        # particlearea_material_id = material_manager.append_material(PARTICLEAREA_MATERIAL)
+        # material_manager.get_materials()[particlearea_material_id].init_material(particlearea_material_id)
 
         self.particlearea = Entity(
             position.tolist(),
             Eulers(False, [0, 0, 0]), 
             scale.tolist(), 
-            mesh_id=particlearea_mesh_id, 
-            shader_id=particlearea_shader_id, 
-            material_id=particlearea_material_id
+            mesh=PARTICLEAREA_MESH, 
+            shaders=PARTICLEAREA_SHADERS, 
+            material=PARTICLEAREA_MATERIAL
         )
         self.particlearea.set_label(PARTICLEAREA_LABEL)
+
+        scene.append_entity(self.particlearea)
+
         return position, scale
 
     def create_initial_particle_positions(self, position, scale):
@@ -124,10 +124,11 @@ class Fluid(Entity):
         data.pop(-1)
         return np.array(data, dtype=np.float32)
 
-    def init_fluid(self, mesh_manager: MeshManager, material_manager: MaterialManager, shader_manager: ShaderManager) -> None:
+    def mounted(self, scene: Scene):#, mesh_manager: MeshManager, material_manager: MaterialManager, shader_manager: ShaderManager) -> None:
+        
         self.init_fluid_shaders()
 
-        position, scale = self.create_bounding_box(mesh_manager, material_manager, shader_manager)
+        position, scale = self.create_bounding_box(scene)
 
         initial_positions = self.create_initial_particle_positions(position, scale)
 
@@ -145,14 +146,14 @@ class Fluid(Entity):
         create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 6)
 
     def draw(self, scene: Scene):
-        particlearea_material: Material = scene.manager.material_manager.get_materials()[self.particlearea.material_id]
-        particlearea_material.use(self.particlearea.material_id)
+        #particlearea_material: Material = scene.manager.material_manager.get_materials()[self.particlearea.material_id]
+        PARTICLEAREA_MATERIAL.use()
 
-        particlearea_shader: Shader = scene.manager.shader_manager.get_shaders()[self.particlearea.shader_id]
-        particlearea_shader.set_mat4x4("model", self.particlearea.get_model_matrix())
+        #particlearea_shader: Shader = scene.manager.shader_manager.get_shaders()[self.particlearea.shader_id]
+        PARTICLEAREA_SHADERS.set_mat4x4("model", self.particlearea.get_model_matrix())
 
-        particlearea_mesh: Mesh = scene.manager.mesh_manager.get_meshes()[self.particlearea.mesh_id]
-        particlearea_mesh.draw()
+        #particlearea_mesh: Mesh = scene.manager.mesh_manager.get_meshes()[self.particlearea.mesh_id]
+        PARTICLEAREA_MESH.draw()
 
         self.particle_shaders.set_vec3("camPos", scene.get_camera().get_position())
         self.particle_mesh.prepare_to_draw()
@@ -174,6 +175,13 @@ class Fluid(Entity):
         #   - positions = positions + speed*delta
         #   - resolveCollisions
 
+    def destroy(self):
+        PARTICLEAREA_MATERIAL.destroy()
+        PARTICLEAREA_MESH.destroy()
+        PARTICLEAREA_SHADERS.destroy()
+
+        self.particle_mesh.destroy()
+        self.particle_shaders.destroy()
 
 class GPUSort:
     def __init__(self, index_buffer_size: int) -> None:

@@ -1,3 +1,8 @@
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from core.models.mesh import Mesh
+    from core.models.material import Material
+    from core.models.shader import Shader
 """
 Une entité est une classe générale qui contient les paramètres suivant:
 - Une position (x, y, z)
@@ -104,15 +109,18 @@ class Entity:
         self.has_shaders = False
         self.has_update_func = False
         _keys = options.keys()
-        if "mesh_id" in _keys:
+        if "mesh" in _keys:
             self.has_mesh = True
-            self.mesh_id = options.get("mesh_id", None)
-            if "shader_id" in _keys:
+            self.mesh: Mesh= options.get("mesh", None)
+            self.mesh.init_mesh()
+            if "shaders" in _keys:
                 self.has_shaders = True
-                self.shader_id = options.get("shader_id", None)
-            if "material_id" in _keys:
+                self.shaders: Shader= options.get("shaders", None)
+                self.shaders.init_shader()
+            if "material" in _keys:
                 self.has_material = True
-                self.material_id = options.get("material_id", None)
+                self.material: Material = options.get("material", None)
+                self.material.init_material()
         if "update" in _keys:
             self.has_update_func = True
             self.update_func = options.get("update")
@@ -180,6 +188,14 @@ class Entity:
 
     def get_orientation(self) -> Eulers:
         return self.eulers
+    
+    def destroy(self) -> None:
+        if self.has_mesh:
+            self.mesh.destroy()
+        if self.has_material:
+            self.material.destroy()
+        if self.has_shaders:
+            self.shaders.destroy()
 
 
 class Camera(Entity):

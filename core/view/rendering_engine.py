@@ -57,26 +57,23 @@ class RenderingEngine:
     def __init__(self, scene: Scene) -> None:
         self.scene = scene
 
-        scene.manager.shader_manager.set_one_time_uniforms()
+        scene.set_one_time_uniforms()
 
 
     def render(self, delta: float) -> None:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         view_matrix = self.scene.get_camera().get_view_matrix()
-        self.scene.manager.shader_manager.set_view_matrix(view_matrix)
+        self.scene.set_view_matrix(view_matrix)
         for entity in self.scene.get_entities().values():
             if entity.has_mesh:
                 if entity.has_shaders:
-                    shader: Shader = self.scene.manager.shader_manager.get_shaders()[entity.shader_id]
-                    shader.set_mat4x4("model", entity.get_model_matrix())
-
+                    shaders: Shader = entity.shaders
+                    shaders.set_mat4x4("model", entity.get_model_matrix())
                     if entity.has_material:
-                        self.scene.manager.shader_manager.set_material(entity.shader_id, entity.material_id)
-                        material: Material = self.scene.manager.material_manager.get_materials()[entity.material_id]
-                        material.use(entity.material_id)
-                mesh: Mesh = self.scene.manager.mesh_manager.get_meshes()[entity.mesh_id]
-                mesh.draw()
+                        shaders.set_int("imageTexture", entity.material.get_id())
+                        entity.material.use()
+                entity.mesh.draw()
             if entity.is_fluid:
                 entity.draw(self.scene)
             entity.update(delta)

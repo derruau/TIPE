@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 from OpenGL.GL import *
 import glfw
 import numpy as np
-from OpenGL.GL.shaders import compileProgram, compileShader
 from core.view.rendering_engine import RenderingEngine
 
 class App:
@@ -18,7 +17,6 @@ class App:
 
     def __init__(
             self, 
-            scene: Scene, 
             input_scheme: InputScheme, 
             handle_inputs: callable,
             window_height: int,
@@ -37,11 +35,6 @@ class App:
 
         self._init_OpenGL()
 
-        self.scene = scene
-        self.scene.manager.init_managers()
-        self.rendering_engine = RenderingEngine(self.scene)
-
-        self.main_loop()
 
     def _init_glfw(self) -> None:
         """
@@ -158,7 +151,11 @@ class App:
         self.frames_rendered += 1
         self.last_frame = current_time
 
-    def main_loop(self):
+    def set_scene(self, scene: Scene) -> None:
+        self.scene = scene
+        self.rendering_engine = RenderingEngine(self.scene)
+
+    def start(self):
         """
         La boucle principale du jeu. Elle invoque le rendering engine et events claviers et calcule les FPS
         """
@@ -182,5 +179,4 @@ class App:
         """
         glfw.destroy_window(self.window)
         glfw.terminate()
-        self.scene.manager.destroy()
         self.scene.destroy_scene()
