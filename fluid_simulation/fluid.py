@@ -25,6 +25,15 @@ FLUIDPARTICLE_SHADERS = Shader("./fluid_simulation/fluid_vertex.glsl", "./fluid_
 FLUIDPARTICLE_COMPUTE = ComputeShader("./fluid_simulation/fluid_compute.glsl")
 FLUIDPARTICLE_PADDING = 0.01
 
+
+def create_buffer(data: np.ndarray, binding_point: 1):
+    buffer = glGenBuffers(1)
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
+    glNamedBufferStorage(buffer, data.nbytes, data, GL_DYNAMIC_STORAGE_BIT)
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_point, buffer)
+    return buffer
+
+
 class Fluid(Entity):
     def __init__(
             self, 
@@ -59,37 +68,16 @@ class Fluid(Entity):
         self.particlearea = None
         self.particlearea_initialized = False
 
-    def create_buffer(self, data: np.ndarray, binding_point: 1):
-        buffer = glGenBuffers(1)
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
-        glNamedBufferStorage(buffer, data.nbytes, data, GL_DYNAMIC_STORAGE_BIT)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_point, buffer)
-        return buffer
-    
-    def dispatch_compute_shader(self):
-        pass
-
     def init_fluid_shaders(self):
         # Initialisation du fragment et vertex shader
         self.particle_shaders.init_shader()
         self.particle_mesh.init_mesh()
-        glUseProgram(self.particle_shaders.get_shaders())
-        glUniform1f(
-            glGetUniformLocation(self.particle_shaders.get_shaders(), "particleSize"),
-            self.particle_size
-        )
-        
+        self.particle_shaders.set_float("particleSize", self.particle_size)
+
         # Initialisation du compute shader
         FLUIDPARTICLE_COMPUTE.init_shader()
-        FLUIDPARTICLE_COMPUTE.use()
-        glUniform3fv(
-            glGetUniformLocation(FLUIDPARTICLE_COMPUTE.get(), "sim_corner_1"), 1,
-            self.simulation_corner_1.tolist()
-        )
-        glUniform3fv(
-            glGetUniformLocation(FLUIDPARTICLE_COMPUTE.get(), "sim_corner_2"), 1 ,
-            self.simulation_corner_2.tolist()
-        )
+        FLUIDPARTICLE_COMPUTE.set_vec3("sim_corner_1", self.simulation_corner_1)
+        FLUIDPARTICLE_COMPUTE.set_vec3("sim_corner_2", self.simulation_corner_2)
 
     def create_bounding_box(self, mesh_manager: MeshManager, material_manager: MaterialManager, shader_manager: ShaderManager):
         position = 0.5*(self.simulation_corner_1 + self.simulation_corner_2)
@@ -144,53 +132,47 @@ class Fluid(Entity):
         initial_positions = self.create_initial_particle_positions(position, scale)
 
         # Creation du buffer positions
-        self.create_buffer(initial_positions, 1)
+        create_buffer(initial_positions, 1)
         # Création du buffer predictedPositions
-        self.create_buffer(initial_positions, 2)
+        create_buffer(initial_positions, 2)
         # Création du buffer velocities
-        self.create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 3)
+        create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 3)
         # Creation du buffer Densities
-        self.create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 4)
+        create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 4)
         # Création du buffer SpatialIndices
-        self.create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 5)
+        create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 5)
         # Création du buffer SpatialOffsets
-        self.create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 6)
+        create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 6)
 
     def draw(self, scene: Scene):
         particlearea_material: Material = scene.manager.material_manager.get_materials()[self.particlearea.material_id]
         particlearea_material.use(self.particlearea.material_id)
+
         particlearea_shader: Shader = scene.manager.shader_manager.get_shaders()[self.particlearea.shader_id]
-        glUseProgram(particlearea_shader.get_shaders())
-        glUniformMatrix4fv(
-                        glGetUniformLocation(particlearea_shader.get_shaders(), "model"),
-                        1,
-                        GL_FALSE,
-                        self.particlearea.get_model_matrix()
-        )
+        particlearea_shader.set_mat4x4("model", self.particlearea.get_model_matrix())
+
         particlearea_mesh: Mesh = scene.manager.mesh_manager.get_meshes()[self.particlearea.mesh_id]
-        particlearea_mesh.prepare_to_draw()
         particlearea_mesh.draw()
 
-        glUseProgram(self.particle_shaders.get_shaders())
-        glUniform3fv(
-            glGetUniformLocation(self.particle_shaders.get_shaders(), "camPos"), 1,
-            scene.get_camera().get_position()
-        )
+        self.particle_shaders.set_vec3("camPos", scene.get_camera().get_position())
         self.particle_mesh.prepare_to_draw()
         glDrawArraysInstanced(GL_TRIANGLES, 0, self.particle_mesh.vertex_count ,self.particle_count)
 
-    def switch_draw_buffer(self):
-        # Bitwise xor
-        self.draw_buffer_index = self.draw_buffer_index ^ 1
-
     def update(self, delta:float):
-        FLUIDPARTICLE_COMPUTE.use()
-        glUniform1f(
-            glGetUniformLocation(FLUIDPARTICLE_COMPUTE.get(), "delta"),
-            delta
-        )
-        glDispatchCompute(self.particle_count, 1, 1)
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+        FLUIDPARTICLE_COMPUTE.set_float("delta", delta)
+        FLUIDPARTICLE_COMPUTE.dispatch(self.particle_count)
+
+
+        #Odre de l'update:
+        # - calculer les forces externes
+        # - spatialHashKernel
+        # - gpuSort
+        # - densityKernel
+        # - pressureKernel
+        # - viscosityKernel
+        # - updatePositionsKernel
+        #   - positions = positions + speed*delta
+        #   - resolveCollisions
 
 
 class GPUSort:
@@ -202,18 +184,12 @@ class GPUSort:
         self.sort_shader.init_shader()
         self.offset_shader.init_shader()
 
-        self.numEntries_location = glGetUniformLocation(self.sort_shader.get(), "numEntries")
-        self.groupWidth_location = glGetUniformLocation(self.sort_shader.get(), "groupWidth")
-        self.groupHeight_location = glGetUniformLocation(self.sort_shader.get(), "groupHeight")
-        self.stepIndex_location = glGetUniformLocation(self.sort_shader.get(), "stepIndex")
-
     def next_power_of_2(self, x):  
         return 1 if x == 0 else 2**(x - 1).bit_length()
 
 
     def sort(self):
-        self.sort_shader.use()
-        glUniform1i(self.numEntries_location, self.buffer_size)
+        self.sort_shader.set_int("numEntries", self.buffer_size)
         
         num_stages = log2(self.next_power_of_2(self.buffer_size))
 
@@ -222,22 +198,19 @@ class GPUSort:
                 # Même chose que 2**(stage_index - step_index) mais beaucoup plus rapide
                 groupWidth = 1 << (stage_index - step_index)
                 groupHeigth = 2* groupWidth - 1
-                glUniform1i(self.groupWidth_location, groupWidth)
-                glUniform1i(self.groupHeight_location, groupHeigth)
-                glUniform1i(self.stepIndex_location, step_index)
+                self.sort_shader.set_int("groupWidth", groupWidth)
+                self.sort_shader.set_int("groupHeight", groupHeigth)
+                self.sort_shader.set_int("stepIndex", step_index)
 
-                glDispatchCompute(self.next_power_of_2(self.buffer_size) // 2, 1, 1)                
+                instances_to_dispatch = self.next_power_of_2(self.buffer_size) // 2
+                self.sort_shader.dispatch(instances_to_dispatch)
 
 
     def sort_and_calculate_offsets(self):
         self.sort()
 
-        self.offset_shader.use()
-        glUniform1i(
-            glGetUniformLocation(self.offset_shader.get(), "numEntries"), self.buffer_size
-        )
-
-        glDispatchCompute(self.buffer_size, 1, 1)
+        self.offset_shader.set_int("numEntries", self.buffer_size)
+        self.offset_shader.dispatch(self.buffer_size)
 
 
 

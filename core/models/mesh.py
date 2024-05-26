@@ -132,6 +132,7 @@ class Mesh:
         Dessine la mesh à l'écran. 
         TOUJOURS appeler prepare_to_draw() avant cette fonction!!
         """
+        self.prepare_to_draw()
         glDrawArrays(self.point_type, 0, self.vertex_count)
 
     def destroy(self) -> None:

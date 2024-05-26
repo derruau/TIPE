@@ -11,7 +11,12 @@ from OpenGL.GL import (
     GL_FRAGMENT_SHADER, 
     glUseProgram, 
     glGetUniformLocation, 
-    glUniform1i, 
+    glUniform1i,
+    glUniform1f,
+    glUniform3fv,
+    glUniform3iv,
+    glUniformMatrix3fv,
+    glUniformMatrix4fv,
     glDeleteProgram,
     GL_COMPUTE_SHADER, 
     glGenBuffers, 
@@ -19,7 +24,11 @@ from OpenGL.GL import (
     glBufferData, 
     glBindBufferBase,
     GL_UNIFORM_BUFFER, 
-    GL_STREAM_DRAW
+    GL_STREAM_DRAW,
+    glDispatchCompute,
+    glMemoryBarrier,
+    GL_SHADER_STORAGE_BARRIER_BIT,
+    GL_FALSE
 )
 
 
@@ -56,11 +65,59 @@ class Shader:
         """
         return self.shaders
     
-    def set_uniform(self, name: str, type: str, value: any) -> None:
-        """
-        TODO: A implémenter
-        """
-        pass
+    def use(self) -> None:
+        if self.shaders == None:
+            raise Exception("Le compute shader n'a pas été correctement initialisé!")
+        glUseProgram(self.shaders)
+
+    def set_int(self, uniform_name: str, value: int) -> None:
+        self.use()
+        glUniform1i(
+            glGetUniformLocation(self.shaders, uniform_name),
+            value
+        )
+
+    def set_float(self, uniform_name: str, value: float) -> None:
+        self.use()
+        glUniform1f(
+            glGetUniformLocation(self.shaders, uniform_name),
+            value
+        )
+
+    def set_vec3(self, uniform_name: str, value: list[float]) -> None:
+        self.use()
+        glUniform3fv(
+            glGetUniformLocation(self.shaders, uniform_name),
+            1,
+            value
+        )
+
+    def set_ivec3(self, uniform_name: str, value: list[int]) -> None:
+        self.use()
+        glUniform3iv(
+            glGetUniformLocation(self.shaders, uniform_name), 
+            1,
+            value
+
+        )
+
+    def set_mat3x3(self, uniform_name: str, value: list[list[float]]) -> None:
+        self.use()
+        glUniformMatrix3fv(
+            glGetUniformLocation(self.shaders, uniform_name),
+            1, 
+            GL_FALSE,
+            value
+        )
+
+    def set_mat4x4(self, uniform_name: str, value: list[list[float]]) -> None:
+        self.use()
+        glUniformMatrix4fv(
+            glGetUniformLocation(self.shaders, uniform_name),
+            1, 
+            GL_FALSE,
+            value
+        )
 
     def destroy(self) -> None:
         """
@@ -304,3 +361,57 @@ class ComputeShader:
         if self.shader == None:
             raise Exception(f"Le compute shader {self.filename} n'a pas été correctement initialisé!")
         glUseProgram(self.shader)
+
+    def dispatch(self, n_instances: int):
+        self.use()
+        glDispatchCompute(n_instances, 1, 1)
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+
+    def set_int(self, uniform_name: str, value: int) -> None:
+        self.use()
+        glUniform1i(
+            glGetUniformLocation(self.shader, uniform_name),
+            value
+        )
+
+    def set_float(self, uniform_name: str, value: float) -> None:
+        self.use()
+        glUniform1f(
+            glGetUniformLocation(self.shader, uniform_name),
+            value
+        )
+
+    def set_vec3(self, uniform_name: str, value: list[float]) -> None:
+        self.use()
+        glUniform3fv(
+            glGetUniformLocation(self.shader, uniform_name),
+            1,
+            value
+        )
+
+    def set_ivec3(self, uniform_name: str, value: list[int]) -> None:
+        self.use()
+        glUniform3iv(
+            glGetUniformLocation(self.shader, uniform_name), 
+            1,
+            value
+
+        )
+
+    def set_mat3x3(self, uniform_name: str, value: list[list[float]]) -> None:
+        self.use()
+        glUniformMatrix3fv(
+            glGetUniformLocation(self.shader, uniform_name),
+            1, 
+            GL_FALSE,
+            value
+        )
+
+    def set_mat4x4(self, uniform_name: str, value: list[list[float]]) -> None:
+        self.use()
+        glUniformMatrix4fv(
+            glGetUniformLocation(self.shader, uniform_name),
+            1, 
+            GL_FALSE,
+            value
+        )
