@@ -17,6 +17,7 @@ from OpenGL.GL import (
     glDispatchCompute,
     glMemoryBarrier,
     GL_SHADER_STORAGE_BARRIER_BIT,
+    GL_ALL_BARRIER_BITS,
     GL_FALSE
 )
 
@@ -170,7 +171,7 @@ class ComputeShader:
     def dispatch(self, n_instances: int):
         self.use()
         glDispatchCompute(n_instances, 1, 1)
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)
+        glMemoryBarrier(GL_ALL_BARRIER_BITS)
 
     def set_int(self, uniform_name: str, value: int) -> None:
         self.use()

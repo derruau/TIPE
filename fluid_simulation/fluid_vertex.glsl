@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 
 layout(location=0) in vec3 vertexPos;
 layout(location=2) in vec3 vertexNormal;
@@ -19,6 +19,7 @@ uniform float particleSize = 1;
 out vec2 fragmentTexCoord;
 out vec3 fragmentNormal;
 out vec3 fragmentPosition;
+out int instanceID;
 
 
 void main() {
@@ -38,4 +39,5 @@ void main() {
     //fragmentNormal = mat3(model) * vertexNormal;
     fragmentNormal = mat3(model) * normalize(vertexPos);
     fragmentPosition = (model * vec4(vertexPos, 1.0)).xyz;
+    instanceID = gl_InstanceID;
 }

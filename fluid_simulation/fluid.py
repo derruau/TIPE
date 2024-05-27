@@ -4,6 +4,7 @@ if TYPE_CHECKING:
     from core.view.scene import Scene
 
 import numpy as np
+from enum import Enum
 from core.view.scene import Scene 
 from core.models.entity import Entity, Eulers
 from core.models.material import Material
@@ -11,6 +12,8 @@ from core.models.mesh import Mesh
 from core.models.shader import Shader, ComputeShader
 from OpenGL.GL import *
 from math import floor, log2
+from OpenGL.arrays.numbers import NumberHandler
+
 
 PARTICLEAREA_MESH = Mesh("./assets/cube.obj", GL_TRIANGLES, False)
 PARTICLEAREA_MATERIAL = Material("./assets/white_borders.png", False)
@@ -22,13 +25,44 @@ FLUIDPARTICLE_SHADERS = Shader("./fluid_simulation/fluid_vertex.glsl", "./fluid_
 FLUIDPARTICLE_COMPUTE = ComputeShader("./fluid_simulation/fluid_compute.glsl")
 FLUIDPARTICLE_PADDING = 0.01
 
+POSITIONS_BINDING_POINT = 1
+PREDICTED_POSITIONS_BINDING_POINT = 2
+VELOCITIES_BINDING_POINT = 3
+DENSITIES_BINDING_POINT = 4
+SPATIAL_INDICES_BINDING_POINT = 5
+SPATIAL_OFFSETS_BINDING_POINT = 6
+PARAMS_BINDING_POINT = 7
 
-def create_buffer(data: np.ndarray, binding_point: 1):
+class SimParams(Enum):
+    # Le premier composant représent l'offset en mémoire (un float => 4 bytes etc...)
+    # Le 2eme composant représente la taille en byte du paramètre
+    # Le 3eme argument c'est le type de donnée (pour les listes c'est le type des éléments de la liste)
+    SIMULATION_CORNER_1 = (0, 12, np.float32)
+    SIMULATION_CORNER_2 = (12, 12, np.float32)
+    PARTICLE_COUNT = (24, 4, np.int32)
+    PARTICLE_SIZE = (28, 4, np.float32)
+    SMOOTHING_RADIUS = (32, 4, np.float32)
+    TARGET_DENSITY = (36, 4, np.float32)
+    PRESSURE_CST = (40, 4, np.float32)
+    GRAVITY = (44, 4, np.float32)
+    DELTA = (48, 4, np.float32)
+    DISABLE_SIMULATION = (52, 4, bool)
+
+
+
+def create_storage_buffer(data: np.ndarray, binding_point: 1):
     buffer = glGenBuffers(1)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
     glNamedBufferStorage(buffer, data.nbytes, data, GL_DYNAMIC_STORAGE_BIT)
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding_point, buffer)
     return buffer
+
+def create_uniform_buffer(binding_point: int):
+    buffer = glGenBuffers(1)
+    glBindBuffer(GL_UNIFORM_BUFFER, buffer)
+    glBindBufferBase(GL_UNIFORM_BUFFER, binding_point, buffer)
+    return buffer
+    
 
 
 class Fluid(Entity):
@@ -48,22 +82,34 @@ class Fluid(Entity):
             simulation_corner_1[2] + 0.5*(simulation_corner_1[2] - simulation_corner_2[2])
             ]
         super().__init__(middle_position, Eulers(False, [0, 0, 0]), [1.0, 1.0, 1.0])
-        self.is_fluid = True
-        
-        # Les 2 buffers qui contiennent les positions et vitesses des particules
-        self.particles_data_buffers = None
-        self.draw_buffer_index = 0
 
-        self.particle_count = particle_count
+        #paramètres de la simulation
+        self.simulation_corner_1 = np.array(simulation_corner_1, np.float32)
+        self.simulation_corner_2 = np.array(simulation_corner_2, np.float32)
         self.particle_size = particle_size
+        self.particle_count = particle_count
+        self.smoothing_radius = 3.0
+        self.target_density = 4.0
+        self.pressure_cst = 3.0
+        self.gravity = -10.0
+        self.delta = 1.0
+        self.disable_simulation = False
+        
+
+        self.params_buffer = None
+        self.storage_buffers = [0] * 7
+
+        #Différents shaders et objets associés au fluide
         self.particle_mesh: Mesh = particle_mesh
         self.particle_shaders: Shader = particle_shaders
 
-        self.simulation_corner_1 = np.array(simulation_corner_1, np.float32)
-        self.simulation_corner_2 = np.array(simulation_corner_2, np.float32)
-
         self.particlearea = None
-        self.particlearea_initialized = False
+
+        self.compute_external = ComputeShader("./fluid_simulation/compute_shaders/external_forces.glsl")
+        self.compute_external.init_shader()
+        self.compute_update_pos = ComputeShader("./fluid_simulation/compute_shaders/update_pos.glsl")
+        self.compute_update_pos.init_shader()
+
 
     def init_fluid_shaders(self):
         # Initialisation du fragment et vertex shader
@@ -76,16 +122,11 @@ class Fluid(Entity):
         FLUIDPARTICLE_COMPUTE.set_vec3("sim_corner_1", self.simulation_corner_1)
         FLUIDPARTICLE_COMPUTE.set_vec3("sim_corner_2", self.simulation_corner_2)
 
+        self.compute_external.init_shader()
+
     def create_bounding_box(self, scene: Scene):
         position = 0.5*(self.simulation_corner_1 + self.simulation_corner_2)
         scale = abs(self.simulation_corner_1 - self.simulation_corner_2)
-
-        # particlearea_mesh_id = mesh_manager.append_mesh(PARTICLEAREA_MESH)
-        # mesh_manager.get_meshes()[particlearea_mesh_id].init_mesh()
-        # particlearea_shader_id = shader_manager.append_shader(PARTICLEAREA_SHADERS)
-        # shader_manager.get_shaders()[particlearea_shader_id].init_shader()
-        # particlearea_material_id = material_manager.append_material(PARTICLEAREA_MATERIAL)
-        # material_manager.get_materials()[particlearea_material_id].init_material(particlearea_material_id)
 
         self.particlearea = Entity(
             position.tolist(),
@@ -124,7 +165,36 @@ class Fluid(Entity):
         data.pop(-1)
         return np.array(data, dtype=np.float32)
 
-    def mounted(self, scene: Scene):#, mesh_manager: MeshManager, material_manager: MaterialManager, shader_manager: ShaderManager) -> None:
+    def set_simulation_param(self, name: SimParams, value: any):
+        setattr(self, name.name.lower(), value)
+        glBindBuffer(GL_UNIFORM_BUFFER, self.params_buffer)
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, name.value[0], name.value[1], np.array([value], dtype=name.value[2]))
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        
+    def get_simulation_param(self, name: SimParams) -> any:
+        glBindBuffer(GL_UNIFORM_BUFFER, self.params_buffer)
+        data = glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, name.value[0], name.value[1])
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        if name.value[2] == np.float32:
+            d = data.view('<f4')
+            return d[0] if len(d) == 1 else d
+        if name.value[2] == np.int32:
+            d = data.view('<i4')
+            return d[0] if len(d) == 1 else d
+        if name.value[2] == bool:
+            return data.view('<?')[0]
+
+    def get_buffers(self, binding_point: int, start_point = 0, size = None):
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.storage_buffers[binding_point])
+        data = None
+        if size == None:
+            data = glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, start_point, glGetBufferParameteriv(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_SIZE))
+        else:
+            data = glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, start_point, size)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        return data.view('<f4')
+
+    def mounted(self, scene: Scene) -> None:
         
         self.init_fluid_shaders()
 
@@ -133,26 +203,26 @@ class Fluid(Entity):
         initial_positions = self.create_initial_particle_positions(position, scale)
 
         # Creation du buffer positions
-        create_buffer(initial_positions, 1)
+        self.storage_buffers[POSITIONS_BINDING_POINT] = create_storage_buffer(initial_positions, POSITIONS_BINDING_POINT)
         # Création du buffer predictedPositions
-        create_buffer(initial_positions, 2)
+        self.storage_buffers[PREDICTED_POSITIONS_BINDING_POINT] = create_storage_buffer(initial_positions, PREDICTED_POSITIONS_BINDING_POINT)
         # Création du buffer velocities
-        create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 3)
+        self.storage_buffers[VELOCITIES_BINDING_POINT] = create_storage_buffer(np.array([0.1] *3* self.particle_count, dtype=np.float32), VELOCITIES_BINDING_POINT)
         # Creation du buffer Densities
-        create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 4)
+        self.storage_buffers[DENSITIES_BINDING_POINT] = create_storage_buffer(np.array([0] * self.particle_count, dtype=np.float32), DENSITIES_BINDING_POINT)
         # Création du buffer SpatialIndices
-        create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 5)
+        self.storage_buffers[SPATIAL_INDICES_BINDING_POINT] = create_storage_buffer(np.array([0] * self.particle_count, dtype=np.float32), SPATIAL_INDICES_BINDING_POINT)
         # Création du buffer SpatialOffsets
-        create_buffer(np.array([0] * self.particle_count, dtype=np.float32), 6)
+        self.storage_buffers[SPATIAL_OFFSETS_BINDING_POINT] = create_storage_buffer(np.array([0] * self.particle_count, dtype=np.float32), SPATIAL_OFFSETS_BINDING_POINT)
+
+        # On crée le buffer params
+        self.params_buffer = create_uniform_buffer(PARAMS_BINDING_POINT)
+        for param in SimParams:
+            self.set_simulation_param(param, getattr(self, param.name.lower()))
 
     def draw(self, scene: Scene):
-        #particlearea_material: Material = scene.manager.material_manager.get_materials()[self.particlearea.material_id]
         PARTICLEAREA_MATERIAL.use()
-
-        #particlearea_shader: Shader = scene.manager.shader_manager.get_shaders()[self.particlearea.shader_id]
         PARTICLEAREA_SHADERS.set_mat4x4("model", self.particlearea.get_model_matrix())
-
-        #particlearea_mesh: Mesh = scene.manager.mesh_manager.get_meshes()[self.particlearea.mesh_id]
         PARTICLEAREA_MESH.draw()
 
         self.particle_shaders.set_vec3("camPos", scene.get_camera().get_position())
@@ -160,11 +230,15 @@ class Fluid(Entity):
         glDrawArraysInstanced(GL_TRIANGLES, 0, self.particle_mesh.vertex_count ,self.particle_count)
 
     def update(self, delta:float):
-        FLUIDPARTICLE_COMPUTE.set_float("delta", delta)
-        FLUIDPARTICLE_COMPUTE.dispatch(self.particle_count)
+        self.compute_update_pos.set_float("delta", delta)
+        #self.set_simulation_param(SimParams.DELTA, delta)
 
-
+        #self.compute_external.dispatch(self.particle_count)
+        self.compute_update_pos.dispatch(self.particle_count)
+        #print(self.get_simulation_param(SimParams.DELTA))
+        #print(self.get_buffers(VELOCITIES_BINDING_POINT))
         #Odre de l'update:
+
         # - calculer les forces externes
         # - spatialHashKernel
         # - gpuSort

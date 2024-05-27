@@ -73,9 +73,7 @@ class RenderingEngine:
                     if entity.has_material:
                         shaders.set_int("imageTexture", entity.material.get_id())
                         entity.material.use()
-                entity.mesh.draw()
-            if entity.is_fluid:
-                entity.draw(self.scene)
+            entity.draw(self.scene)
             entity.update(delta)
         glFlush()
 

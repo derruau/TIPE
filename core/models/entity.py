@@ -197,6 +197,16 @@ class Entity:
         if self.has_shaders:
             self.shaders.destroy()
 
+    def draw(self, scene):
+        """
+        On passe la scène car dès fois on en a besoin pour certains objets (notamment le fluide)
+        """
+        if self.has_mesh:
+            self.mesh.draw()
+
+    def __repr__(self) -> str:
+        return self.get_label()
+
 
 class Camera(Entity):
     """
