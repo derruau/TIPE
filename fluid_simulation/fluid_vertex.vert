@@ -11,6 +11,18 @@ layout (binding = 0, std140) uniform Matrices
 };
 layout(binding=1, std430) buffer positionsBuffer {vec3 positions[]; };
 layout(binding=3, std430) buffer velocitiesBuffer { vec3 velocities[]; };
+layout(binding=7, std430) buffer paramsBuffer {
+	vec3 sim_corner_1;
+	vec3 sim_corner_2;
+	int numParticles;
+	float particleSize;
+	float smoothingRadius;
+	float targetDensity;
+	float pressureCst;
+	float gravity;
+    float delta;
+	bool disable_simulation;
+} params;
 
 
 layout(location = 4) uniform int readBuffer = 0; 
@@ -19,7 +31,7 @@ uniform float particleSize = 1;
 out vec2 fragmentTexCoord;
 out vec3 fragmentNormal;
 out vec3 fragmentPosition;
-out int instanceID;
+flat out int instanceID;
 
 
 void main() {
@@ -38,6 +50,6 @@ void main() {
     gl_Position = projection * view * model * vec4(vertexPos, 1.0);
     //fragmentNormal = mat3(model) * vertexNormal;
     fragmentNormal = mat3(model) * normalize(vertexPos);
-    fragmentPosition = (model * vec4(vertexPos, 1.0)).xyz;
+    fragmentPosition = (model * vec4(vertexPos, 0.0)).xyz;
     instanceID = gl_InstanceID;
 }

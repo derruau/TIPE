@@ -18,7 +18,8 @@ from OpenGL.GL import (
     glMemoryBarrier,
     GL_SHADER_STORAGE_BARRIER_BIT,
     GL_ALL_BARRIER_BITS,
-    GL_FALSE
+    GL_FALSE,
+    glGetError
 )
 
 
@@ -29,19 +30,18 @@ class Shader:
     """
     Un shader individuel
     """
-    __slots__ = ("_used_by", "_keep_in_memory", "vertex_path", "fragment_path", "shaders")
+    __slots__ = ("_used_by", "init_on_creation", "vertex_path", "fragment_path", "shaders")
 
-    def __init__(self, vertex_path: str, fragment_path:str, keep_in_memory: bool) -> None:
-        """
-        Si keep_in_memory = False, dès qu'aucune entitée n'utilise le shader, elle se fait détruire de la mémoire.
-        """
+    def __init__(self, vertex_path: str, fragment_path:str, init_on_creation:bool=False) -> None:
         self._used_by = 0 # Le nombre d'entités qui utilisent ce shader
-        self._keep_in_memory = keep_in_memory # Si jamais on doit garder la ressource en mémoire même si elle n'est plus utilisée nulle part
         
         self.vertex_path = vertex_path
         self.fragment_path = fragment_path
         # Définis dans self.init_shader()
         self.shaders = None
+
+        if init_on_creation:
+            self.init_shader()
 
     def init_shader(self) -> None:
         """
@@ -151,9 +151,11 @@ class Shader:
 
 
 class ComputeShader:
-    def __init__(self, filename: str) -> None:
+    def __init__(self, filename: str, init_on_creation: bool=False) -> None:
         self.filename = filename
         self.shader = None
+        if init_on_creation:
+            self.init_shader()
 
     def init_shader(self) -> None:
         with open(self.filename, "r") as f:

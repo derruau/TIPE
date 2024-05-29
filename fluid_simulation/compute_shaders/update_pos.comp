@@ -3,8 +3,7 @@
 layout(binding=1, std430) buffer positionsBuffer {vec3 positions[]; };
 layout(binding=3, std430) buffer velocitiesBuffer { vec3 velocities[]; };
 
-uniform float delta;
-layout (binding = 7, std140) uniform params {
+layout(binding=7, std430) buffer paramsBuffer {
 	vec3 sim_corner_1;
 	vec3 sim_corner_2;
 	int numParticles;
@@ -13,8 +12,8 @@ layout (binding = 7, std140) uniform params {
 	float targetDensity;
 	float pressureCst;
 	float gravity;
-    float delta_;
-    bool disable_simulation;
+    float delta;
+	bool disable_simulation;
 };
 
 void resolveCollisions(uint index) {
@@ -30,7 +29,7 @@ void resolveCollisions(uint index) {
     if (abs(center.z - positions[index].z) > size.z) {
         velocities[index].z *= -1;
     }
-};
+}
 
 
 void UpdatePositions(uint id)
@@ -40,10 +39,10 @@ void UpdatePositions(uint id)
 	positions[id] += velocities[id]* delta;
     velocities[0] = 100 *vec3(delta, delta, delta);
 	//resolveCollisions(id);
-};
+}
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main() {
     positions[gl_WorkGroupID.x] += vec3(0, 1, 0) * delta;
     //UpdatePositions(gl_WorkGroupID.x);
-};
+}

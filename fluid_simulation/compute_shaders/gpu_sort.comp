@@ -11,7 +11,7 @@ uniform int stepIndex;
 //Implémentation du Bitonic Merge Sort
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main() {
-	uint i = gl_InstanceID;
+	uint i = gl_WorkGroupID.x;
 
 	uint hIndex = i & (groupWidth - 1);
 	uint indexLeft = hIndex + (groupHeight + 1) * (i / groupWidth);

@@ -34,10 +34,14 @@ const ivec3 offsets3D[27] = ivec3[27](
 const int hashK1 = 15823;
 const int hashK2 = 9737333;
 const int hashK3 = 440817757;
+const float PI = 3.14159;
 
+layout(binding=1, std430) buffer positionsBuffer {vec3 positions[]; };
+layout(binding=2, std430) buffer predictedPositionsBuffer { vec3 predictedPositions[]; };
+layout(binding=3, std430) buffer velocitiesBuffer { vec3 velocities[]; };
 layout(binding=4, std430) buffer densitiesBuffer { float densities[]; };
 layout(binding=5, std430) buffer spatialIndicesBuffer { uvec3 spatialIndices[]; };
-layout(binding=6, std430) buffer spatialOffsetsBuffer { int spatialOffsets[]; };
+layout(binding=6, std430) buffer spatialOffsetsBuffer { uint spatialOffsets[]; };
 
 uniform bool disable_simulation = true;
 uniform int numParticles;
@@ -49,15 +53,15 @@ uniform float gravity;
 
 ivec3 GetCell3D(vec3 position, float radius) {
     return ivec3(position.x / radius, position.y / radius, position.z / radius);
-};
+}
 
 int HashCell3D(ivec3 cell) {
     return cell.x * hashK1 + cell.y * hashK2 + cell.z * hashK3;
-};
+}
 
-ivec3 GetCell3D(vec3 position, float radius) {
-    return ivec3(position.x / radius, position.y / radius, position.z / radius);
-};
+int KeyFromHash(int hash, int tableSize) {
+    return hash % tableSize;
+}
 
 // 3d conversion: done
 //Integrate[(h-r)^2 r^2 Sin[θ], {r, 0, h}, {θ, 0, π}, {φ, 0, 2*π}]
@@ -74,9 +78,9 @@ float SpikyKernelPow2(float dst, float radius)
 
 float DensityKernel(float dst, float radius) {
     return SpikyKernelPow2(dst, radius);
-};
+}
 
-void calculateDensities(int id) {
+void calculateDensities(uint id) {
 	if (id >= numParticles) return;
 
 	vec3 pos = predictedPositions[id];
@@ -90,7 +94,7 @@ void calculateDensities(int id) {
 	{
 		int hash = HashCell3D(originCell + offsets3D[i]);
 		int key = KeyFromHash(hash, numParticles);
-		int currIndex = spatialOffsets[key];
+		uint currIndex = spatialOffsets[key];
 
 		while (currIndex < numParticles)
 		{
@@ -117,9 +121,9 @@ void calculateDensities(int id) {
 	}
 	
 	densities[id] = density; //float2(density, nearDensity);
-};
+}
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main() {
-    calculateDensities(gl_InstanceID);
-};
+    calculateDensities(gl_WorkGroupID.x);
+}

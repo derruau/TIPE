@@ -2,11 +2,24 @@
 
 layout(binding=3, std430) buffer velocitiesBuffer { vec3 velocities[]; };
 
+layout(binding=7, std430) buffer paramsBuffer {
+	vec3 sim_corner_1;
+	vec3 sim_corner_2;
+	int numParticles;
+	float particleSize;
+	float smoothingRadius;
+	float targetDensity;
+	float pressureCst;
+	float gravity;
+    float delta;
+	bool disable_simulation;
+} params;
+
 uniform vec3 camPos;
 
 in vec3 fragmentNormal;
 in vec3 fragmentPosition;
-in int instanceID;
+flat in int instanceID;
 out vec4 color;
 
 
@@ -15,11 +28,8 @@ vec3 lightColor = vec3(1.0, 1.0, 1.0);
 float lightStrength = 0.5;
 
 void main() {
-    /*
-    Le *3 c'est pour manuellement ajuster la texture sur le cube de base
-    Sinon le if c'est pour que la transparence marche
-    */
-    vec3 particleColor = velocities[0]; //]vec3(velocities[instanceID][0], 0.0, 0.0);
+
+    vec3 particleColor = vec3(velocities[instanceID][0], 0.0, 0.0);
 
     vec3 result = vec3(0);
 
