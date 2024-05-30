@@ -1,0 +1,50 @@
+#version 430
+
+layout(binding=2, std430) buffer predictedPositionsBuffer { vec3 predictedPositions[]; };
+layout(binding=5, std430) buffer spatialIndicesBuffer { uvec3 spatialIndices[]; };
+layout(binding=6, std430) buffer spatialOffsetsBuffer { uint spatialOffsets[]; };
+
+layout(binding=7, std430) buffer paramsBuffer {
+	vec3 sim_corner_1;
+	vec3 sim_corner_2;
+	int numParticles;
+	float particleSize;
+	float smoothingRadius;
+	float targetDensity;
+	float pressureCst;
+	float gravity;
+    float delta;
+	bool disable_simulation;
+};
+
+
+const int hashK1 = 15823;
+const int hashK2 = 9737333;
+const int hashK3 = 440817757;
+
+
+ivec3 GetCell3D(vec3 position, float radius) {
+    return ivec3(position.x / radius, position.y / radius, position.z / radius);
+}
+
+int HashCell3D(ivec3 cell) {
+    return cell.x * hashK1 + cell.y * hashK2 + cell.z * hashK3;
+}
+
+uint KeyFromHash(uint hash, int tableSize) {
+    return hash % tableSize;
+}
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+void main() {
+    uint index = gl_WorkGroupID.x;
+	if (index >= numParticles) return;
+
+	// Reset offsets
+	spatialOffsets[index] = numParticles;
+	// Update index buffer
+	ivec3 cell = GetCell3D(predictedPositions[index], smoothingRadius);
+	uint hash = HashCell3D(cell);
+	uint key = KeyFromHash(hash, numParticles);
+	spatialIndices[index] = uvec3(index, hash, key);
+}

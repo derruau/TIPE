@@ -102,7 +102,7 @@ def start_game() -> None:
     app = App(input_scheme, handle_inputs, WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_TITLE)
 
     scene = Scene(FOV_Y, ASPECT_RATIO, NEAR_PLANE_CLIPPING, FAR_PLANE_CLIPPING, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_ANGLE)
-    fluid = Fluid(14, 0.45, [-2.5, -2.5, -2.5], [2.5, 2.5, 2.5])
+    fluid = Fluid(16, 0.45, [-2.5, -2.5, -2.5], [2.5, 2.5, 2.5])
     scene.append_entity(fluid)
     
     app.set_scene(scene)

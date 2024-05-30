@@ -22,6 +22,7 @@ FLUID_SHADER_PATH = {
     "GPU_SORT_OFFSET": "./fluid_simulation/compute_shaders/gpu_sort_offset.comp",
     "GPU_SORT": "./fluid_simulation/compute_shaders/gpu_sort.comp",
     "PRESSURE": "./fluid_simulation/compute_shaders/pressure.comp",
+    "SPATIAL_HASH": "./fluid_simulation/compute_shaders/spatial_hash.comp",
     "UPDATE_POSITION": "./fluid_simulation/compute_shaders/update_pos.comp",
     "VISCOSITY": "./fluid_simulation/compute_shaders/viscosity.comp",
 }
@@ -59,7 +60,12 @@ class SimParams(Enum):
     DISABLE_SIMULATION = (56, 4, bool)
 
 
-def create_buffer(data: np.ndarray, binding_point: 1):
+def create_buffer(data: np.ndarray, binding_point: int):
+    """
+    Crée un SSBO avec les données data.
+    Bien veiller à ce que le binding point soit unique dans toute la codebase car 
+    les SSBO sont communs à tout les shaders.
+    """
     buffer = glGenBuffers(1)
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer)
     glNamedBufferStorage(buffer, data.nbytes, data, GL_DYNAMIC_STORAGE_BIT)
@@ -82,10 +88,10 @@ class Fluid(Entity):
         self.simulation_corner_2 = np.array(simulation_corner_2, dtype=np.float32)
         self.particle_count = particle_count
         self.particle_size = particle_size
-        self.smoothing_radius = 1.0
-        self.target_density = 0.0
-        self.pressure_cst = 0.0
-        self.gravity = 0.0
+        self.smoothing_radius = 0.2
+        self.target_density = 0.0 # Cette variable est calculée dans mounted()
+        self.pressure_cst = 1.0
+        self.gravity = -10.0
         self.delta = 0.0
         self.disable_simulation = False
         
@@ -111,9 +117,12 @@ class Fluid(Entity):
         # Initialisation des compute shader
         self.compute_density = ComputeShader(FLUID_SHADER_PATH["DENSITIES"], init_on_creation=True)
         self.compute_external = ComputeShader(FLUID_SHADER_PATH["EXTERNAL_FORCES"], init_on_creation=True)
-        self.pressure = ComputeShader(FLUID_SHADER_PATH["PRESSURE"], init_on_creation=True)
-        self.viscosity = ComputeShader(FLUID_SHADER_PATH["VISCOSITY"], init_on_creation=True)
+        self.compute_pressure = ComputeShader(FLUID_SHADER_PATH["PRESSURE"], init_on_creation=True)
+        self.compute_spatial_hash = ComputeShader(FLUID_SHADER_PATH["SPATIAL_HASH"], init_on_creation=True)
+        #self.viscosity = ComputeShader(FLUID_SHADER_PATH["VISCOSITY"], init_on_creation=True)
         self.compute_update_pos = ComputeShader(FLUID_SHADER_PATH["UPDATE_POSITION"], init_on_creation=True)
+        
+        self.compute_sort = GPUSort(self.particle_count)
 
     def create_bounding_box(self, scene: Scene) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -148,6 +157,7 @@ class Fluid(Entity):
         if self.particle_count > max_particles:
             print(f"Trop de particules dans la zone de simulation, le nombre de particule est donc réduit au maximum: {max_particles}")
             self.particle_count = max_particles
+            self.compute_sort.buffer_size = self.particle_count
 
         data = []
         for i in range(self.particle_count):
@@ -195,7 +205,7 @@ class Fluid(Entity):
         if name.value[2] == bool:
             return data.view('<?')[0]
 
-    def get_buffers(self, binding_point: int, start_point: int = 0, size: int = None) -> np.ndarray:
+    def get_buffers(self, binding_point: int, view_as: str = "<f4",start_point: int = 0, size: int = None) -> np.ndarray:
         """
         Retourne un des storage buffers qui contiennent les données des particules.
         Les données que l'on peut avoir sont:
@@ -216,7 +226,7 @@ class Fluid(Entity):
         else:
             data = glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, start_point, size)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
-        return data.view('<f4')
+        return data.view(view_as)
 
     def mounted(self, scene: Scene) -> None:
         """
@@ -227,15 +237,18 @@ class Fluid(Entity):
 
         position, scale = self.create_bounding_box(scene)
 
+        target_density = float(self.particle_count / scale.prod())
+        self.target_density = target_density
+
         initial_positions = self.create_initial_particle_positions(position, scale)
 
         # Creation des buffers où les données des particules sont stockées
         self.storage_buffers[POSITIONS_BINDING_POINT] = create_buffer(initial_positions, POSITIONS_BINDING_POINT)
         self.storage_buffers[PREDICTED_POSITIONS_BINDING_POINT] = create_buffer(initial_positions, PREDICTED_POSITIONS_BINDING_POINT)
-        self.storage_buffers[VELOCITIES_BINDING_POINT] = create_buffer(np.array([0.1] *3* self.particle_count, dtype=np.float32), VELOCITIES_BINDING_POINT)
+        self.storage_buffers[VELOCITIES_BINDING_POINT] = create_buffer(np.array([0.0] *4* self.particle_count, dtype=np.float32), VELOCITIES_BINDING_POINT)
         self.storage_buffers[DENSITIES_BINDING_POINT] = create_buffer(np.array([0] * self.particle_count, dtype=np.float32), DENSITIES_BINDING_POINT)
-        self.storage_buffers[SPATIAL_INDICES_BINDING_POINT] = create_buffer(np.array([0] * self.particle_count, dtype=np.float32), SPATIAL_INDICES_BINDING_POINT)
-        self.storage_buffers[SPATIAL_OFFSETS_BINDING_POINT] = create_buffer(np.array([0] * self.particle_count, dtype=np.float32), SPATIAL_OFFSETS_BINDING_POINT)
+        self.storage_buffers[SPATIAL_INDICES_BINDING_POINT] = create_buffer(np.array([0] *4* self.particle_count, dtype=np.int32), SPATIAL_INDICES_BINDING_POINT)
+        self.storage_buffers[SPATIAL_OFFSETS_BINDING_POINT] = create_buffer(np.array([0] * self.particle_count, dtype=np.int32), SPATIAL_OFFSETS_BINDING_POINT)
         
         #Création du buffer qui contient les paramètres de la simulation
         # En mémoire les données sont stockés comme ça:
@@ -263,7 +276,7 @@ class Fluid(Entity):
         du fluide. On 
         """
         PARTICLEAREA_MATERIAL.use()
-        PARTICLEAREA_SHADERS.set_mat4x4("model", self.particlearea.get_model_matrix())
+        PARTICLEAREA_SHADERS.set_mat4x4("model", self.particle_area.get_model_matrix())
         PARTICLEAREA_MESH.draw()
 
         self.particle_shaders.set_vec3("camPos", scene.get_camera().get_position())
@@ -276,9 +289,14 @@ class Fluid(Entity):
         Fonction appelée par rendering_engine.py après draw() pour toutes les entités de la scène.
         C'est ici que la position des particules de fluide est mise à jour.
         """
+        if self.disable_simulation:
+            return 
         self.set_simulation_param(SimParams.DELTA, delta)
-
-        #self.compute_external.dispatch(self.particle_count)
+        self.compute_external.dispatch(self.particle_count)
+        self.compute_spatial_hash.dispatch(self.particle_count)
+        self.compute_sort.sort_and_calculate_offsets()
+        self.compute_density.dispatch(self.particle_count)
+        self.compute_pressure.dispatch(self.particle_count)
         #self.compute_update_pos.dispatch(self.particle_count)
         #Odre de l'update:
 
@@ -308,11 +326,8 @@ class Fluid(Entity):
 class GPUSort:
     def __init__(self, index_buffer_size: int) -> None:
         self.buffer_size = index_buffer_size
-        self.sort_shader = ComputeShader("./fluid_simulation/gpu_sort.comp")
-        self.offset_shader = ComputeShader("./fluid_simulation/gpu_sort_offset.comp")
-
-        self.sort_shader.init_shader()
-        self.offset_shader.init_shader()
+        self.sort_shader = ComputeShader(FLUID_SHADER_PATH["GPU_SORT"], init_on_creation=True)
+        self.offset_shader = ComputeShader(FLUID_SHADER_PATH["GPU_SORT_OFFSET"], init_on_creation=True)
 
     def next_power_of_2(self, x :int):
         """
@@ -333,7 +348,7 @@ class GPUSort:
         """
         self.sort_shader.set_int("numEntries", self.buffer_size)
         
-        num_stages = log2(self.next_power_of_2(self.buffer_size))
+        num_stages = int(log2(self.next_power_of_2(self.buffer_size)))
 
         for stage_index in range(num_stages):
             for step_index in range(stage_index + 1):

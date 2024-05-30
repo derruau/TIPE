@@ -34,15 +34,14 @@ void resolveCollisions(uint index) {
 
 void UpdatePositions(uint id)
 {
-	//if (id >= numParticles) return;
+	if (id >= numParticles) return;
 
 	positions[id] += velocities[id]* delta;
-    velocities[0] = 100 *vec3(delta, delta, delta);
-	//resolveCollisions(id);
+	resolveCollisions(id);
 }
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 void main() {
-    positions[gl_WorkGroupID.x] += vec3(0, 1, 0) * delta;
-    //UpdatePositions(gl_WorkGroupID.x);
+    //positions[gl_WorkGroupID.x] += vec3(0, 1, 0) * delta;
+    UpdatePositions(gl_WorkGroupID.x);
 }
