@@ -142,7 +142,8 @@ Le moteur de jeu utilise la structure '[model view controller](https://fr.wikipe
 
 
 # TODO
-- AJOUTER UN MOYEN DE DEPLACER LA CAMERA DANS LES COORDONNEES ABSOLUES ET NON RELATIVE AU VECTEUR FORWARD!!
+- Intégrer ImGUI et faire un UI sympa
 - Clean le code
-- Rajouter de la documentation
 - Compléter le manuel tex
+- Rajouter de la documentation
+- Etre plus consistent avec les notations, par exemple, toujours écrire shaders au lieu de shader, etc...

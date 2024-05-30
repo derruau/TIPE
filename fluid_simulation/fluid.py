@@ -98,20 +98,27 @@ class Fluid(Entity):
         self.particle_shaders: Shader = particle_shaders
         self.particle_area = None
 
-    def init_fluid_shaders(self):
+    def init_fluid_shaders(self) -> None:
+        """
+        Cette fonction initialise les fragment et vertex shaders des particules ainsi que tout
+        les compute shaders.
+        """
         # Initialisation du fragment et vertex shader
         self.particle_shaders.init_shader()
         self.particle_mesh.init_mesh()
         self.particle_shaders.set_float("particleSize", self.particle_size)
 
-        # Initialisation du compute shader
+        # Initialisation des compute shader
         self.compute_density = ComputeShader(FLUID_SHADER_PATH["DENSITIES"], init_on_creation=True)
         self.compute_external = ComputeShader(FLUID_SHADER_PATH["EXTERNAL_FORCES"], init_on_creation=True)
         self.pressure = ComputeShader(FLUID_SHADER_PATH["PRESSURE"], init_on_creation=True)
         self.viscosity = ComputeShader(FLUID_SHADER_PATH["VISCOSITY"], init_on_creation=True)
         self.compute_update_pos = ComputeShader(FLUID_SHADER_PATH["UPDATE_POSITION"], init_on_creation=True)
 
-    def create_bounding_box(self, scene: Scene):
+    def create_bounding_box(self, scene: Scene) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Crée l'entitée visuelle qui indique les limites de la simulation
+        """
         position = 0.5*(self.simulation_corner_1 + self.simulation_corner_2)
         scale = abs(self.simulation_corner_1 - self.simulation_corner_2)
 
@@ -129,7 +136,11 @@ class Fluid(Entity):
 
         return position, scale
 
-    def create_initial_particle_positions(self, position, scale):
+    def create_initial_particle_positions(self, position: np.ndarray, scale: np.ndarray) -> np.ndarray:
+        """
+        Renvoit les positions initiales des particules de la simulation.
+        Les particules sont arrangés en grille.
+        """
         max_particles_x = floor(scale[0]/((self.particle_size + FLUIDPARTICLE_PADDING)))
         max_particles_y = floor(scale[1]/((self.particle_size + FLUIDPARTICLE_PADDING)))
         max_particles_z = floor(scale[2]/((self.particle_size + FLUIDPARTICLE_PADDING)))
@@ -150,7 +161,13 @@ class Fluid(Entity):
         data.pop(-1)
         return np.array(data, dtype=np.float32)
 
-    def set_simulation_param(self, name: SimParams, value: any):
+    def set_simulation_param(self, name: SimParams, value: any) -> None:
+        """
+        Permet de modifier un des 10 paramètres de la simulation, listés 
+        par l'enum SimParams. 
+
+        Noter que les listes doivent être des listes numpy avec un datatype np.float32
+        """
         setattr(self, name.name.lower(), value)
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.params_buffer)
         if type(value) == np.ndarray:
@@ -162,6 +179,10 @@ class Fluid(Entity):
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         
     def get_simulation_param(self, name: SimParams) -> any:
+        """
+        Retourne le paramètre de la simulation demandé. Tout les paramètres
+        qui peuvent être demandés sont dans l'enum SimParams
+        """
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.params_buffer)
         data = glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, name.value[0], name.value[1])
         glBindBuffer(GL_ARRAY_BUFFER, 0)
@@ -174,7 +195,20 @@ class Fluid(Entity):
         if name.value[2] == bool:
             return data.view('<?')[0]
 
-    def get_buffers(self, binding_point: int, start_point = 0, size = None):
+    def get_buffers(self, binding_point: int, start_point: int = 0, size: int = None) -> np.ndarray:
+        """
+        Retourne un des storage buffers qui contiennent les données des particules.
+        Les données que l'on peut avoir sont:
+            - POSITIONS_BINDING_POINT = 1
+            - PREDICTED_POSITIONS_BINDING_POINT = 2
+            - VELOCITIES_BINDING_POINT = 3
+            - DENSITIES_BINDING_POINT = 4
+            - SPATIAL_INDICES_BINDING_POINT = 5
+            - SPATIAL_OFFSETS_BINDING_POINT = 6
+
+        On peut aussi demander un extrait du buffer avec les paramètres start_point et size.
+        L'extrait demandé (en octet) avec ces paramètres est [start_point; start_point + size]
+        """
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.storage_buffers[binding_point])
         data = None
         if size == None:
@@ -185,6 +219,10 @@ class Fluid(Entity):
         return data.view('<f4')
 
     def mounted(self, scene: Scene) -> None:
+        """
+        Cette fonction est appelée  dans la fonction append_entity de scene.py lorsque 
+        le fluide est ajoutée à la scène. Ça sert à automatiquement l'initialiser.
+        """
         self.init_fluid_shaders()
 
         position, scale = self.create_bounding_box(scene)
@@ -219,16 +257,25 @@ class Fluid(Entity):
             val = getattr(self, param.name.lower())
             self.set_simulation_param(param, val)
         
-    def draw(self, scene: Scene):
+    def draw(self, scene: Scene)-> None:
+        """
+        Fonction appelée par rendering_engine.py lorsqu'on doit faire le rendu graphique
+        du fluide. On 
+        """
         PARTICLEAREA_MATERIAL.use()
         PARTICLEAREA_SHADERS.set_mat4x4("model", self.particlearea.get_model_matrix())
         PARTICLEAREA_MESH.draw()
 
         self.particle_shaders.set_vec3("camPos", scene.get_camera().get_position())
         self.particle_mesh.prepare_to_draw()
+        # On dessine des instances de la particule et non n entités disctinctes pour aller beaucoup plus vite
         glDrawArraysInstanced(GL_TRIANGLES, 0, self.particle_mesh.vertex_count ,self.particle_count)
 
-    def update(self, delta:float):
+    def update(self, delta:float) -> None:
+        """
+        Fonction appelée par rendering_engine.py après draw() pour toutes les entités de la scène.
+        C'est ici que la position des particules de fluide est mise à jour.
+        """
         self.set_simulation_param(SimParams.DELTA, delta)
 
         #self.compute_external.dispatch(self.particle_count)
@@ -245,7 +292,11 @@ class Fluid(Entity):
         #   - positions = positions + speed*delta
         #   - resolveCollisions
 
-    def destroy(self):
+    def destroy(self) -> None:
+        """
+        Fonction appelée lorsqu'on quitte le programme pour proprement nettoyer
+        la mémoire de la carte graphique.
+        """
         PARTICLEAREA_MATERIAL.destroy()
         PARTICLEAREA_MESH.destroy()
         PARTICLEAREA_SHADERS.destroy()
@@ -263,11 +314,23 @@ class GPUSort:
         self.sort_shader.init_shader()
         self.offset_shader.init_shader()
 
-    def next_power_of_2(self, x):  
+    def next_power_of_2(self, x :int):
+        """
+        Retourne la puissance de 2 supérieure à x la plus proche.
+
+        Par exemple si x = 14, la fonction renvoit 16
+        """  
         return 1 if x == 0 else 2**(x - 1).bit_length()
 
 
     def sort(self):
+        """
+        Utilise l'algorithme de tri bitonique pour trier la grille de partitionnement de l'espace.
+        
+        ATTENTION: NE CALCULE PAS spatialOffsets!!! POUR CELA, APPELER sort_and_calculate_offsets()
+        
+        Pour en savoir plus sur comment la fonction marche, regarder ./docs/OpenGL_3D_Engine_Manual.pdf
+        """
         self.sort_shader.set_int("numEntries", self.buffer_size)
         
         num_stages = log2(self.next_power_of_2(self.buffer_size))
@@ -286,11 +349,11 @@ class GPUSort:
 
 
     def sort_and_calculate_offsets(self):
+        """
+        Fonction à appeler pour effectuer tout le travail et trier
+        spatialIndices et calculer spatialOffsets
+        """
         self.sort()
 
         self.offset_shader.set_int("numEntries", self.buffer_size)
         self.offset_shader.dispatch(self.buffer_size)
-
-
-
-
