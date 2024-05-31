@@ -14,6 +14,7 @@ layout(binding=7, std430) buffer paramsBuffer {
 	float pressureCst;
 	float gravity;
     float delta;
+	float collisionDampingFactor;
 	bool disable_simulation;
 };
 
@@ -35,9 +36,9 @@ uint KeyFromHash(uint hash, int tableSize) {
     return hash % tableSize;
 }
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 void main() {
-    uint index = gl_WorkGroupID.x;
+    uint index = gl_GlobalInvocationID.x;
 	if (index >= numParticles) return;
 
 	// Reset offsets

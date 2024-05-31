@@ -45,9 +45,11 @@ SPATIAL_OFFSETS_BINDING_POINT = 6
 PARAMS_BINDING_POINT = 7
 
 class SimParams(Enum):
-    # Le premier composant représent l'offset en mémoire (un float => 4 bytes etc...)
-    # Le 2eme composant représente la taille en byte du paramètre
-    # Le 3eme argument c'est le type de donnée (pour les listes c'est le type des éléments de la liste)
+    """ 
+    Le premier composant représent l'offset en mémoire (un float => 4 bytes etc...)
+    Le 2eme composant représente la taille en byte du paramètre
+    Le 3eme argument c'est le type de donnée (pour les listes c'est le type des éléments de la liste)
+    """
     SIMULATION_CORNER_1 = (0, 16, np.float32)
     SIMULATION_CORNER_2 = (16, 12, np.float32)
     PARTICLE_COUNT = (28, 4, np.int32)
@@ -57,7 +59,8 @@ class SimParams(Enum):
     PRESSURE_CST = (44, 4, np.float32)
     GRAVITY = (48, 4, np.float32)
     DELTA = (52, 4, np.float32)
-    DISABLE_SIMULATION = (56, 4, bool)
+    COLLISION_DAMPING_FACTOR = (56, 4, np.float32)
+    DISABLE_SIMULATION = (60, 4, bool)
 
 
 def create_buffer(data: np.ndarray, binding_point: int):
@@ -88,11 +91,12 @@ class Fluid(Entity):
         self.simulation_corner_2 = np.array(simulation_corner_2, dtype=np.float32)
         self.particle_count = particle_count
         self.particle_size = particle_size
-        self.smoothing_radius = 0.2
+        self.smoothing_radius = 5.0
         self.target_density = 0.0 # Cette variable est calculée dans mounted()
-        self.pressure_cst = 1.0
+        self.pressure_cst = -10.0
         self.gravity = -10.0
         self.delta = 0.0
+        self.collision_damping_factor = 0.5
         self.disable_simulation = False
         
         # Références aux buffers au cas où on en ai besoin
@@ -250,6 +254,7 @@ class Fluid(Entity):
         self.storage_buffers[SPATIAL_INDICES_BINDING_POINT] = create_buffer(np.array([0] *4* self.particle_count, dtype=np.int32), SPATIAL_INDICES_BINDING_POINT)
         self.storage_buffers[SPATIAL_OFFSETS_BINDING_POINT] = create_buffer(np.array([0] * self.particle_count, dtype=np.int32), SPATIAL_OFFSETS_BINDING_POINT)
         
+
         #Création du buffer qui contient les paramètres de la simulation
         # En mémoire les données sont stockés comme ça:
         #              padding
@@ -263,8 +268,9 @@ class Fluid(Entity):
         # 0.0, # pressure_cst
         # 0.0, # gravity
         # 0.0, # delta
+        # 0.0, # collision_damping_factor 
         # 0.0, # disable_simulation
-        dummy_data = np.array([0.0]*15, dtype=np.float32)
+        dummy_data = np.array([0.0]*16, dtype=np.float32)
         self.params_buffer = create_buffer(dummy_data, PARAMS_BINDING_POINT)
         for param in SimParams:
             val = getattr(self, param.name.lower())
@@ -292,12 +298,14 @@ class Fluid(Entity):
         if self.disable_simulation:
             return 
         self.set_simulation_param(SimParams.DELTA, delta)
+
+        #print(self.get_buffers(VELOCITIES_BINDING_POINT, '<f4'))
         self.compute_external.dispatch(self.particle_count)
         self.compute_spatial_hash.dispatch(self.particle_count)
         self.compute_sort.sort_and_calculate_offsets()
         self.compute_density.dispatch(self.particle_count)
         self.compute_pressure.dispatch(self.particle_count)
-        #self.compute_update_pos.dispatch(self.particle_count)
+        self.compute_update_pos.dispatch(self.particle_count)
         #Odre de l'update:
 
         # - calculer les forces externes

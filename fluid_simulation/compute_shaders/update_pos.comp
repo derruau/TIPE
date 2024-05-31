@@ -13,6 +13,7 @@ layout(binding=7, std430) buffer paramsBuffer {
 	float pressureCst;
 	float gravity;
     float delta;
+    float collisionDampingFactor;
 	bool disable_simulation;
 };
 
@@ -21,13 +22,16 @@ void resolveCollisions(uint index) {
     vec3 size = vec3(abs(sim_corner_2.x - sim_corner_1.x),abs(sim_corner_2.y - sim_corner_1.y),abs(sim_corner_2.z - sim_corner_1.z));
 
     if (abs(center.x - positions[index].x) > size.x) {
-        velocities[index].x *= -1;
+        positions[index].x = center.x + sign(velocities[index].x) *( size.x - 0.01);
+        velocities[index].x *= -1 * collisionDampingFactor;
     };
     if (abs(center.y - positions[index].y) > size.y) {
-        velocities[index].y *= -1;
+        positions[index].y = center.y + sign(velocities[index].y) *(size.y - 0.01) ;
+        velocities[index].y *= -1 * collisionDampingFactor;
     };
     if (abs(center.z - positions[index].z) > size.z) {
-        velocities[index].z *= -1;
+        positions[index].z = center.z + sign(velocities[index].z) *(size.z - 0.01);
+        velocities[index].z *= -1 * collisionDampingFactor;
     }
 }
 
@@ -36,12 +40,12 @@ void UpdatePositions(uint id)
 {
 	if (id >= numParticles) return;
 
-	positions[id] += velocities[id]* delta;
+	positions[id] += velocities[id]* 0.01667;
 	resolveCollisions(id);
 }
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 void main() {
     //positions[gl_WorkGroupID.x] += vec3(0, 1, 0) * delta;
-    UpdatePositions(gl_WorkGroupID.x);
+    UpdatePositions(gl_GlobalInvocationID.x);
 }

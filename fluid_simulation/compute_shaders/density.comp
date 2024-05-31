@@ -1,4 +1,4 @@
-#version 430
+#version 430 core
 
 const ivec3 offsets3D[27] = ivec3[27](
     ivec3(-1, -1, -1),
@@ -43,12 +43,20 @@ layout(binding=4, std430) buffer densitiesBuffer { float densities[]; };
 layout(binding=5, std430) buffer spatialIndicesBuffer { uvec3 spatialIndices[]; };
 layout(binding=6, std430) buffer spatialOffsetsBuffer { uint spatialOffsets[]; };
 
-uniform bool disable_simulation = true;
-uniform int numParticles;
-uniform float smoothingRadius;
-uniform float targetDensity;
-uniform float pressureCst;
-uniform float gravity;
+
+layout(binding=7, std430) buffer paramsBuffer {
+	vec3 sim_corner_1;
+	vec3 sim_corner_2;
+	int numParticles;
+	float particleSize;
+	float smoothingRadius;
+	float targetDensity;
+	float pressureCst;
+	float gravity;
+    float delta;
+	float collisionDampingFactor;
+	bool disable_simulation;
+};
 
 
 ivec3 GetCell3D(vec3 position, float radius) {
@@ -123,7 +131,7 @@ void calculateDensities(uint id) {
 	densities[id] = density; //float2(density, nearDensity);
 }
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 void main() {
-    calculateDensities(gl_WorkGroupID.x);
+    calculateDensities(gl_GlobalInvocationID.x);
 }

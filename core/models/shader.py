@@ -21,7 +21,7 @@ from OpenGL.GL import (
     GL_FALSE,
     glGetError
 )
-
+from math import ceil
 
 MAX_CONCURENT_SHADERS = 128
 
@@ -172,7 +172,11 @@ class ComputeShader:
 
     def dispatch(self, n_instances: int):
         self.use()
-        glDispatchCompute(n_instances, 1, 1)
+        #Dans tout les compute shaders, j'ai mis le paramètre:
+        # layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+        # Ca veut dire que 1 groupe a une taille locale de 64, donc pour avoir le bon nombre d'invocations
+        # du shader on divise le nombre d'instance par 64.
+        glDispatchCompute(ceil(n_instances/64), 1, 1)
         glMemoryBarrier(GL_ALL_BARRIER_BITS)
 
     def set_int(self, uniform_name: str, value: int) -> None:

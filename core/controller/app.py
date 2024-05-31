@@ -9,8 +9,10 @@ if TYPE_CHECKING:
 
 from OpenGL.GL import *
 import glfw
-import numpy as np
 from core.view.rendering_engine import RenderingEngine
+
+PROFILING_PATH = "./profiling/"
+MAX_PROFILED_FRAMES_PER_SESSION = 1000
 
 class App:
     __slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme", "scene", "rendering_engine", "delta", "last_frame")
@@ -155,10 +157,22 @@ class App:
         self.scene = scene
         self.rendering_engine = RenderingEngine(self.scene)
 
-    def start(self):
+    def start(self, profiling: bool=False):
         """
         La boucle principale du jeu. Elle invoque le rendering engine et events claviers et calcule les FPS
         """
+        if profiling:
+            import cProfile
+            import pstats
+            from time import time
+            from pathlib import Path
+            from os import listdir
+
+            Path(PROFILING_PATH).mkdir(parents=True, exist_ok=True)
+            profile_id = len(listdir(PROFILING_PATH))
+            profile_directory = PROFILING_PATH + f"profile-{profile_id:0>4}/"
+            Path(profile_directory).mkdir(parents=True, exist_ok=True)
+
         width, height = glfw.get_window_size(self.window)
         glfw.set_cursor_pos(self.window, width / 2, height / 2)
         while not glfw.window_should_close(self.window):
@@ -166,9 +180,16 @@ class App:
             self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
             glfw.poll_events()
             
-            self.scene.get_entities()[1].set_scale([(np.cos((self.frames_rendered/30 - 1) ) + 1), 1.0, 1.0]) # Pour faire bouger le cube
-            self.rendering_engine.render(self.delta)
+            if profiling:
+                with cProfile.Profile() as profile:
+                    self.rendering_engine.render(self.delta)
+                results = pstats.Stats(profile)
+                results.sort_stats(pstats.SortKey.TIME)
+                if self.frames_rendered < MAX_PROFILED_FRAMES_PER_SESSION:
+                    results.dump_stats(profile_directory + f"frame-{self.frames_rendered}.profile")
 
+            else:
+                self.rendering_engine.render(self.delta)
             glfw.swap_buffers(self.window)
             self.calculate_fps()
         self.quit()
