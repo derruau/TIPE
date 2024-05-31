@@ -29,6 +29,7 @@ HORIZONTAL_INVERT = -1
 CAMERA_MOVEMENT_THRESHOLD = 0.00001
 DEFAULT_CAMERA_POSITION = [0, 1, -10]
 DEFAULT_CAMERA_ANGLE = Eulers(True, [PI/2, PI/2, 0])
+CAMERA_PIVOT_POINT = np.array([0, 0, 0])
 
 def handle_inputs(window, keys: dict[int, bool], scene :Scene, input_scheme: InputScheme) -> None:
     """
@@ -85,6 +86,8 @@ def handle_mouse(window, keys: dict[int, bool], scene: Scene, input_scheme: Inpu
     """
     S'occupe de définir les actions à effectuer lorsqu'on bouge la souris et qu'on appuie sur ses boutons.
     """
+    if input_scheme.should_action_happen("click", keys):
+        pass
     camera = scene.get_camera()
     x,y = glfw.get_cursor_pos(window)
     d_eulers = CAM_SENSITIVITY * (WINDOW_WIDTH / 2 - x) * GLOBAL_X * HORIZONTAL_INVERT
@@ -103,6 +106,7 @@ def start_game() -> None:
 
     scene = Scene(FOV_Y, ASPECT_RATIO, NEAR_PLANE_CLIPPING, FAR_PLANE_CLIPPING, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_ANGLE)
     fluid = Fluid(5000, 0.3, [-2.5, -2.5, -2.5], [2.5, 2.5, 2.5])
+    fluid.set_label("Fluide")
     scene.append_entity(fluid)
     
     app.set_scene(scene)

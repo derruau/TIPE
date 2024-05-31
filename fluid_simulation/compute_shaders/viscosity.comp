@@ -1,6 +1,132 @@
 #version 430 core
 
+layout(binding=2, std430) buffer predictedPositionsBuffer { vec3 predictedPositions[]; };
+layout(binding=3, std430) buffer velocitiesBuffer { vec3 velocities[]; };
+layout(binding=4, std430) buffer densitiesBuffer { float densities[]; };
+layout(binding=5, std430) buffer spatialIndicesBuffer { uvec3 spatialIndices[]; };
+layout(binding=6, std430) buffer spatialOffsetsBuffer { int spatialOffsets[]; };
 
+
+layout(binding=7, std430) buffer paramsBuffer {
+	vec3 sim_corner_1;
+	vec3 sim_corner_2;
+	int numParticles;
+	float particleSize;
+	float smoothingRadius;
+	float targetDensity;
+	float pressureCst;
+	float gravity;
+    float delta;
+	float collisionDampingFactor;
+	float viscosityStrength;
+	bool disable_simulation;
+};
+
+const ivec3 offsets3D[27] = ivec3[27](
+    ivec3(-1, -1, -1),
+	ivec3(-1, -1, 0),
+	ivec3(-1, -1, 1),
+	ivec3(-1, 0, -1),
+	ivec3(-1, 0, 0),
+	ivec3(-1, 0, 1),
+	ivec3(-1, 1, -1),
+	ivec3(-1, 1, 0),
+	ivec3(-1, 1, 1),
+	ivec3(0, -1, -1),
+	ivec3(0, -1, 0),
+	ivec3(0, -1, 1),
+	ivec3(0, 0, -1),
+	ivec3(0, 0, 0),
+	ivec3(0, 0, 1),
+	ivec3(0, 1, -1),
+	ivec3(0, 1, 0),
+	ivec3(0, 1, 1),
+	ivec3(1, -1, -1),
+	ivec3(1, -1, 0),
+	ivec3(1, -1, 1),
+	ivec3(1, 0, -1),
+	ivec3(1, 0, 0),
+	ivec3(1, 0, 1),
+	ivec3(1, 1, -1),
+	ivec3(1, 1, 0),
+	ivec3(1, 1, 1)
+);
+
+const int hashK1 = 15823;
+const int hashK2 = 9737333;
+const int hashK3 = 440817757;
+const float PI = 3.14159;
+
+
+ivec3 GetCell3D(vec3 position, float radius) {
+    return ivec3(position.x / radius, position.y / radius, position.z / radius);
+}
+
+int HashCell3D(ivec3 cell) {
+    return cell.x * hashK1 + cell.y * hashK2 + cell.z * hashK3;
+}
+
+uint KeyFromHash(uint hash, int tableSize) {
+    return hash % tableSize;
+}
+
+
+float SmoothingKernelPoly6(float dst, float radius)
+{
+	if (dst < radius)
+	{
+		float scale = 315 / (64 * PI * pow(abs(radius), 9));
+		float v = radius * radius - dst * dst;
+		return v * v * v * scale;
+	}
+	return 0;
+}
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 void main() {
-    
+    uint id = gl_GlobalInvocationID.x;
+
+    if (id >= numParticles) return;
+		
+	vec3 pos = predictedPositions[id];
+	ivec3 originCell = GetCell3D(pos, smoothingRadius);
+	float sqrRadius = smoothingRadius * smoothingRadius;
+
+	vec3 viscosityForce = vec3(0);
+	vec3 velocity = velocities[id];
+
+	// Neighbour search
+	for (int i = 0; i < 27; i ++)
+	{
+		uint hash = HashCell3D(originCell + offsets3D[i]);
+		uint key = KeyFromHash(hash, numParticles);
+		uint currIndex = spatialOffsets[key];
+
+		while (currIndex < numParticles)
+		{
+			uvec3 indexData = spatialIndices[currIndex];
+			currIndex ++;
+			// Exit if no longer looking at correct bin
+			if (indexData[2] != key) break;
+			// Skip if hash does not match
+			if (indexData[1] != hash) continue;
+
+			uint neighbourIndex = indexData[0];
+			// Skip if looking at self
+			if (neighbourIndex == id) continue;
+
+			vec3 neighbourPos = predictedPositions[neighbourIndex];
+			vec3 offsetToNeighbour = neighbourPos - pos;
+			float sqrDstToNeighbour = dot(offsetToNeighbour, offsetToNeighbour);
+
+			// Skip if not within radius
+			if (sqrDstToNeighbour > sqrRadius) continue;
+
+			// Calculate viscosity
+			float dst = sqrt(sqrDstToNeighbour);
+			vec3 neighbourVelocity = velocities[neighbourIndex];
+			viscosityForce += (neighbourVelocity - velocity) * SmoothingKernelPoly6(dst, smoothingRadius);
+		}
+	}
+	velocities[id] += viscosityForce * viscosityStrength * delta;
 }

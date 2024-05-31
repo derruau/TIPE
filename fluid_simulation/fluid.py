@@ -36,6 +36,7 @@ FLUIDPARTICLE_MESH = Mesh("./assets/sphere.obj", GL_TRIANGLES, False)
 FLUIDPARTICLE_SHADERS = Shader(FLUID_SHADER_PATH["VERTEX"], FLUID_SHADER_PATH["FRAGMENT"], False)
 FLUIDPARTICLE_PADDING = 0.01
 
+#NE PAS CHANGER CES VALEURS
 POSITIONS_BINDING_POINT = 1
 PREDICTED_POSITIONS_BINDING_POINT = 2
 VELOCITIES_BINDING_POINT = 3
@@ -60,7 +61,8 @@ class SimParams(Enum):
     GRAVITY = (48, 4, np.float32)
     DELTA = (52, 4, np.float32)
     COLLISION_DAMPING_FACTOR = (56, 4, np.float32)
-    DISABLE_SIMULATION = (60, 4, bool)
+    VISCOSITY_STRENGTH = (60, 4, np.float32)
+    DISABLE_SIMULATION = (64, 4, bool)
 
 
 def create_buffer(data: np.ndarray, binding_point: int):
@@ -91,12 +93,13 @@ class Fluid(Entity):
         self.simulation_corner_2 = np.array(simulation_corner_2, dtype=np.float32)
         self.particle_count = particle_count
         self.particle_size = particle_size
-        self.smoothing_radius = 5.0
+        self.smoothing_radius = 1.0
         self.target_density = 0.0 # Cette variable est calculée dans mounted()
-        self.pressure_cst = -10.0
+        self.pressure_cst = 10.0
         self.gravity = -10.0
         self.delta = 0.0
         self.collision_damping_factor = 0.5
+        self.viscosity_strength = 0.2
         self.disable_simulation = False
         
         # Références aux buffers au cas où on en ai besoin
@@ -123,7 +126,7 @@ class Fluid(Entity):
         self.compute_external = ComputeShader(FLUID_SHADER_PATH["EXTERNAL_FORCES"], init_on_creation=True)
         self.compute_pressure = ComputeShader(FLUID_SHADER_PATH["PRESSURE"], init_on_creation=True)
         self.compute_spatial_hash = ComputeShader(FLUID_SHADER_PATH["SPATIAL_HASH"], init_on_creation=True)
-        #self.viscosity = ComputeShader(FLUID_SHADER_PATH["VISCOSITY"], init_on_creation=True)
+        self.compute_viscosity = ComputeShader(FLUID_SHADER_PATH["VISCOSITY"], init_on_creation=True)
         self.compute_update_pos = ComputeShader(FLUID_SHADER_PATH["UPDATE_POSITION"], init_on_creation=True)
         
         self.compute_sort = GPUSort(self.particle_count)
@@ -268,9 +271,10 @@ class Fluid(Entity):
         # 0.0, # pressure_cst
         # 0.0, # gravity
         # 0.0, # delta
-        # 0.0, # collision_damping_factor 
+        # 0.0, # collision_damping_factor
+        # 0.0, # viscosity_strength 
         # 0.0, # disable_simulation
-        dummy_data = np.array([0.0]*16, dtype=np.float32)
+        dummy_data = np.array([0.0]*17, dtype=np.float32)
         self.params_buffer = create_buffer(dummy_data, PARAMS_BINDING_POINT)
         for param in SimParams:
             val = getattr(self, param.name.lower())
@@ -297,26 +301,49 @@ class Fluid(Entity):
         """
         if self.disable_simulation:
             return 
+        
         self.set_simulation_param(SimParams.DELTA, delta)
 
-        #print(self.get_buffers(VELOCITIES_BINDING_POINT, '<f4'))
         self.compute_external.dispatch(self.particle_count)
         self.compute_spatial_hash.dispatch(self.particle_count)
         self.compute_sort.sort_and_calculate_offsets()
         self.compute_density.dispatch(self.particle_count)
         self.compute_pressure.dispatch(self.particle_count)
+        self.compute_viscosity.dispatch(self.particle_count)
         self.compute_update_pos.dispatch(self.particle_count)
-        #Odre de l'update:
 
-        # - calculer les forces externes
-        # - spatialHashKernel
-        # - gpuSort
-        # - densityKernel
-        # - pressureKernel
-        # - viscosityKernel
-        # - updatePositionsKernel
-        #   - positions = positions + speed*delta
-        #   - resolveCollisions
+    def reset_simulation(self, particle_count: int) -> None:
+        """
+        Reinitialise tout les buffers et permet de changer le nombre de particules de la simulation
+        """
+        # Stoppe la simulation
+        self.set_simulation_param(SimParams.DISABLE_SIMULATION, True)
+
+        #Supprime tout les buffers
+        glDeleteBuffers(self.storage_buffers[POSITIONS_BINDING_POINT:])
+        glDeleteBuffers(self.params_buffer)
+
+        # Prépare les nouvelles données
+        self.particle_count = particle_count
+        position = 0.5*(self.simulation_corner_1 + self.simulation_corner_2)
+        scale = abs(self.simulation_corner_1 - self.simulation_corner_2)
+        initial_positions = self.create_initial_particle_positions(position, scale)
+
+        # Initialisation des storage buffers
+        self.storage_buffers[POSITIONS_BINDING_POINT] = create_buffer(initial_positions, POSITIONS_BINDING_POINT)
+        self.storage_buffers[PREDICTED_POSITIONS_BINDING_POINT] = create_buffer(initial_positions, PREDICTED_POSITIONS_BINDING_POINT)
+        self.storage_buffers[VELOCITIES_BINDING_POINT] = create_buffer(np.array([0.0] *4* self.particle_count, dtype=np.float32), VELOCITIES_BINDING_POINT)
+        self.storage_buffers[DENSITIES_BINDING_POINT] = create_buffer(np.array([0] * self.particle_count, dtype=np.float32), DENSITIES_BINDING_POINT)
+        self.storage_buffers[SPATIAL_INDICES_BINDING_POINT] = create_buffer(np.array([0] *4* self.particle_count, dtype=np.int32), SPATIAL_INDICES_BINDING_POINT)
+        self.storage_buffers[SPATIAL_OFFSETS_BINDING_POINT] = create_buffer(np.array([0] * self.particle_count, dtype=np.int32), SPATIAL_OFFSETS_BINDING_POINT)
+
+        # Initilisation du params buffer
+        dummy_data = np.array([0.0]*17, dtype=np.float32)
+        self.params_buffer = create_buffer(dummy_data, PARAMS_BINDING_POINT)
+        for param in SimParams:
+            val = getattr(self, param.name.lower())
+            self.set_simulation_param(param, val)
+
 
     def destroy(self) -> None:
         """

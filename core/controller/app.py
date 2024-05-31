@@ -157,6 +157,18 @@ class App:
         self.scene = scene
         self.rendering_engine = RenderingEngine(self.scene)
 
+    def render_process(self):
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
+        glfw.poll_events()
+
+        self.rendering_engine.render(self.delta)
+
+        glFlush()
+        glfw.swap_buffers(self.window)
+        self.calculate_fps()
+
+
     def start(self, profiling: bool=False):
         """
         La boucle principale du jeu. Elle invoque le rendering engine et events claviers et calcule les FPS
@@ -164,7 +176,6 @@ class App:
         if profiling:
             import cProfile
             import pstats
-            from time import time
             from pathlib import Path
             from os import listdir
 
@@ -176,22 +187,15 @@ class App:
         width, height = glfw.get_window_size(self.window)
         glfw.set_cursor_pos(self.window, width / 2, height / 2)
         while not glfw.window_should_close(self.window):
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-            self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
-            glfw.poll_events()
-            
             if profiling:
                 with cProfile.Profile() as profile:
-                    self.rendering_engine.render(self.delta)
+                    self.render_process()
                 results = pstats.Stats(profile)
                 results.sort_stats(pstats.SortKey.TIME)
                 if self.frames_rendered < MAX_PROFILED_FRAMES_PER_SESSION:
                     results.dump_stats(profile_directory + f"frame-{self.frames_rendered}.profile")
-
             else:
-                self.rendering_engine.render(self.delta)
-            glfw.swap_buffers(self.window)
-            self.calculate_fps()
+                self.render_process()
         self.quit()
 
     def quit(self):

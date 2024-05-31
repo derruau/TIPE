@@ -30,13 +30,14 @@ class Shader:
     """
     Un shader individuel
     """
-    __slots__ = ("_used_by", "init_on_creation", "vertex_path", "fragment_path", "shaders")
+    __slots__ = ("_used_by", "init_on_creation", "vertex_path", "fragment_path", "shaders", "uniform_location_cache")
 
     def __init__(self, vertex_path: str, fragment_path:str, init_on_creation:bool=False) -> None:
         self._used_by = 0 # Le nombre d'entités qui utilisent ce shader
         
         self.vertex_path = vertex_path
         self.fragment_path = fragment_path
+        self.uniform_location_cache = {}
         # Définis dans self.init_shader()
         self.shaders = None
 
@@ -60,24 +61,29 @@ class Shader:
             raise Exception("Le compute shader n'a pas été correctement initialisé!")
         glUseProgram(self.shaders)
 
+    def find_uniform(self, name: str) -> int:
+        if not (name in self.uniform_location_cache):
+            self.uniform_location_cache[name] = glGetUniformLocation(self.shaders, name)
+        return self.uniform_location_cache[name]
+
     def set_int(self, uniform_name: str, value: int) -> None:
         self.use()
         glUniform1i(
-            glGetUniformLocation(self.shaders, uniform_name),
+            self.find_uniform(uniform_name),
             value
         )
 
     def set_float(self, uniform_name: str, value: float) -> None:
         self.use()
         glUniform1f(
-            glGetUniformLocation(self.shaders, uniform_name),
+            self.find_uniform(uniform_name),
             value
         )
 
     def set_vec3(self, uniform_name: str, value: list[float]) -> None:
         self.use()
         glUniform3fv(
-            glGetUniformLocation(self.shaders, uniform_name),
+            self.find_uniform(uniform_name),
             1,
             value
         )
@@ -85,7 +91,7 @@ class Shader:
     def set_ivec3(self, uniform_name: str, value: list[int]) -> None:
         self.use()
         glUniform3iv(
-            glGetUniformLocation(self.shaders, uniform_name), 
+            self.find_uniform(uniform_name), 
             1,
             value
 
@@ -94,7 +100,7 @@ class Shader:
     def set_mat3x3(self, uniform_name: str, value: list[list[float]]) -> None:
         self.use()
         glUniformMatrix3fv(
-            glGetUniformLocation(self.shaders, uniform_name),
+            self.find_uniform(uniform_name),
             1, 
             GL_FALSE,
             value
@@ -103,7 +109,7 @@ class Shader:
     def set_mat4x4(self, uniform_name: str, value: list[list[float]]) -> None:
         self.use()
         glUniformMatrix4fv(
-            glGetUniformLocation(self.shaders, uniform_name),
+            self.find_uniform(uniform_name),
             1, 
             GL_FALSE,
             value
@@ -154,6 +160,7 @@ class ComputeShader:
     def __init__(self, filename: str, init_on_creation: bool=False) -> None:
         self.filename = filename
         self.shader = None
+        self.uniform_location_cache = {}
         if init_on_creation:
             self.init_shader()
 
@@ -170,6 +177,11 @@ class ComputeShader:
             raise Exception(f"Le compute shader {self.filename} n'a pas été correctement initialisé!")
         glUseProgram(self.shader)
 
+    def find_uniform(self, name: str) -> int:
+        if not (name in self.uniform_location_cache):
+            self.uniform_location_cache[name] = glGetUniformLocation(self.shader, name)
+        return self.uniform_location_cache[name]
+
     def dispatch(self, n_instances: int):
         self.use()
         #Dans tout les compute shaders, j'ai mis le paramètre:
@@ -182,21 +194,21 @@ class ComputeShader:
     def set_int(self, uniform_name: str, value: int) -> None:
         self.use()
         glUniform1i(
-            glGetUniformLocation(self.shader, uniform_name),
+            self.find_uniform(uniform_name),
             value
         )
 
     def set_float(self, uniform_name: str, value: float) -> None:
         self.use()
         glUniform1f(
-            glGetUniformLocation(self.shader, uniform_name),
+            self.find_uniform(uniform_name),
             value
         )
 
     def set_vec3(self, uniform_name: str, value: list[float]) -> None:
         self.use()
         glUniform3fv(
-            glGetUniformLocation(self.shader, uniform_name),
+            self.find_uniform(uniform_name),
             1,
             value
         )
@@ -204,7 +216,7 @@ class ComputeShader:
     def set_ivec3(self, uniform_name: str, value: list[int]) -> None:
         self.use()
         glUniform3iv(
-            glGetUniformLocation(self.shader, uniform_name), 
+            self.find_uniform(uniform_name), 
             1,
             value
 
@@ -213,7 +225,7 @@ class ComputeShader:
     def set_mat3x3(self, uniform_name: str, value: list[list[float]]) -> None:
         self.use()
         glUniformMatrix3fv(
-            glGetUniformLocation(self.shader, uniform_name),
+            self.find_uniform(uniform_name),
             1, 
             GL_FALSE,
             value
@@ -222,7 +234,7 @@ class ComputeShader:
     def set_mat4x4(self, uniform_name: str, value: list[list[float]]) -> None:
         self.use()
         glUniformMatrix4fv(
-            glGetUniformLocation(self.shader, uniform_name),
+            self.find_uniform(uniform_name),
             1, 
             GL_FALSE,
             value

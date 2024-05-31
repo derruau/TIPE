@@ -2,9 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.view.scene import Scene
-    from core.models.mesh import Mesh
-    from core.models.material import Material
     from core.models.shader import Shader
+    from core.models.entity import Entity
 
 import numpy as np
 from OpenGL.GL import *
@@ -65,6 +64,7 @@ class RenderingEngine:
 
         view_matrix = self.scene.get_camera().get_view_matrix()
         self.scene.set_view_matrix(view_matrix)
+        entity: Entity
         for entity in self.scene.get_entities().values():
             if entity.has_mesh:
                 if entity.has_shaders:
@@ -75,5 +75,5 @@ class RenderingEngine:
                         entity.material.use()
             entity.draw(self.scene)
             entity.update(delta)
-        glFlush()
+        #glFlush()
 

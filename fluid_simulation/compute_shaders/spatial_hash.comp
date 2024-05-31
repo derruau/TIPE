@@ -15,6 +15,7 @@ layout(binding=7, std430) buffer paramsBuffer {
 	float gravity;
     float delta;
 	float collisionDampingFactor;
+	float viscosityStrength;
 	bool disable_simulation;
 };
 
