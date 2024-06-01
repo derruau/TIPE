@@ -41,7 +41,7 @@ void UpdatePositions(uint id)
 {
 	if (id >= numParticles) return;
 
-	positions[id] += velocities[id]* 0.01667;
+	positions[id] += velocities[id]* 1/60;
 	resolveCollisions(id);
 }
 

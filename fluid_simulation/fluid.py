@@ -93,14 +93,14 @@ class Fluid(Entity):
         self.simulation_corner_2 = np.array(simulation_corner_2, dtype=np.float32)
         self.particle_count = particle_count
         self.particle_size = particle_size
-        self.smoothing_radius = 1.0
-        self.target_density = 0.0 # Cette variable est calculée dans mounted()
-        self.pressure_cst = 10.0
+        self.smoothing_radius = 0.35
+        self.target_density = 35.5
+        self.pressure_cst = 27.33
         self.gravity = -10.0
         self.delta = 0.0
         self.collision_damping_factor = 0.5
-        self.viscosity_strength = 0.2
-        self.disable_simulation = False
+        self.viscosity_strength = 0.06
+        self.disable_simulation = True
         
         # Références aux buffers au cas où on en ai besoin
         self.params_buffer = None
@@ -249,9 +249,6 @@ class Fluid(Entity):
 
         position, scale = self.create_bounding_box(scene)
 
-        target_density = float(self.particle_count / scale.prod())
-        self.target_density = target_density
-
         initial_positions = self.create_initial_particle_positions(position, scale)
 
         # Creation des buffers où les données des particules sont stockées
@@ -299,12 +296,12 @@ class Fluid(Entity):
         # On dessine des instances de la particule et non n entités disctinctes pour aller beaucoup plus vite
         glDrawArraysInstanced(GL_TRIANGLES, 0, self.particle_mesh.vertex_count ,self.particle_count)
 
-    def update(self, delta:float) -> None:
+    def update(self, delta:float, force_update = False) -> None:
         """
         Fonction appelée par rendering_engine.py après draw() pour toutes les entités de la scène.
         C'est ici que la position des particules de fluide est mise à jour.
         """
-        if self.disable_simulation:
+        if self.disable_simulation and not(force_update):
             return 
         
         self.set_simulation_param(SimParams.DELTA, delta)
@@ -317,6 +314,7 @@ class Fluid(Entity):
         self.compute_viscosity.dispatch(self.particle_count)
         self.compute_update_pos.dispatch(self.particle_count)
 
+
     def reset_simulation(self, particle_count: int) -> None:
         """
         Reinitialise tout les buffers et permet de changer le nombre de particules de la simulation
@@ -325,8 +323,9 @@ class Fluid(Entity):
         self.set_simulation_param(SimParams.DISABLE_SIMULATION, True)
 
         #Supprime tout les buffers
-        glDeleteBuffers(self.storage_buffers[POSITIONS_BINDING_POINT:])
-        glDeleteBuffers(self.params_buffer)
+        buffers_to_delete = self.storage_buffers[POSITIONS_BINDING_POINT:]
+        glDeleteBuffers(len(buffers_to_delete), buffers_to_delete)
+        glDeleteBuffers(1, self.params_buffer)
 
         # Prépare les nouvelles données
         self.particle_count = particle_count

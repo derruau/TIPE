@@ -32,6 +32,9 @@ DEFAULT_CAMERA_POSITION = [0, 1, -20]
 DEFAULT_CAMERA_ANGLE = Eulers(True, [-PI/2, PI/2, 0])
 CAMERA_PIVOT_POINT = [0, 0, 0]
 
+FLUID_RENDER_WIDTH = 1280
+FLUID_RENDER_HEIGHT = 707
+
 def handle_inputs(window, keys: dict[int, bool], scene :Scene, input_scheme: InputScheme) -> None:
     """
     Est passé en paramètre de la classe App.
@@ -126,11 +129,11 @@ def start_game() -> None:
     app = App(input_scheme, handle_inputs, WINDOW_HEIGHT, WINDOW_WIDTH, WINDOW_TITLE)
 
     scene = Scene(FOV_Y, ASPECT_RATIO, NEAR_PLANE_CLIPPING, FAR_PLANE_CLIPPING, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_ANGLE)
-    fluid = Fluid(5000, 0.3, [-2.5, -2.5, -2.5], [2.5, 2.5, 2.5])
+    fluid = Fluid(50000, 0.1, [-2.5, -2.5, -2.5], [2.5, 2.5, 2.5])
     fluid.set_label("Fluide")
     scene.append_entity(fluid)
     
-    app.set_scene(scene, render_to_frame_buffer=True, dimensions=(WINDOW_HEIGHT, WINDOW_WIDTH))
+    app.set_scene(scene, render_to_frame_buffer=True, dimensions=(FLUID_RENDER_HEIGHT, FLUID_RENDER_WIDTH))
     app.start(profiling=False)
 
 if __name__ == "__main__":

@@ -6,17 +6,19 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from core.view.scene import Scene
     from core.controller.controls import InputScheme
+    from fluid_simulation.fluid import Fluid
 
 from OpenGL.GL import *
 import glfw
 import imgui
 from imgui.integrations.glfw import GlfwRenderer
 from core.view.rendering_engine import RenderingEngine
+from fluid_simulation.fluid import SimParams
 
 PROFILING_PATH = "./profiling/"
 MAX_PROFILED_FRAMES_PER_SESSION = 1000
 
-PARAMETERS_MENU_WIDTH = 200
+PARAMETERS_MENU_WIDTH = 500
 
 class App:
     __slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme", "scene", "rendering_engine", "delta", "last_frame", "impl", "width", "height")
@@ -182,7 +184,81 @@ class App:
                      True,
                      flags=imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_COLLAPSE,
         )
-        imgui.text("Hello world!")
+        fluid: Fluid = self.scene.get_entities_from_label("Fluide")[0]
+        
+        disable_simulation_clicked, fluid.disable_simulation = imgui.checkbox("Désactiver la simulation", fluid.disable_simulation)
+        if disable_simulation_clicked:
+            fluid.set_simulation_param(SimParams.DISABLE_SIMULATION, fluid.disable_simulation)
+
+        if imgui.button("Avancer d'une frame"):
+            fluid.set_simulation_param(SimParams.DISABLE_SIMULATION, True)
+            fluid.update(self.delta, force_update=True)
+
+        if imgui.button("Reset la simulation"):
+            fluid.set_simulation_param(SimParams.DISABLE_SIMULATION, True)
+            fluid.reset_simulation(fluid.particle_count)
+
+        if fluid.disable_simulation:
+            particle_count_changed, fluid.particle_count = imgui.input_int("Nombre de particules", fluid.particle_count)
+            if particle_count_changed:
+                fluid.reset_simulation(fluid.particle_count)
+
+        particle_size_changed, fluid.particle_size = imgui.slider_float(
+            "Taille des particules", fluid.particle_size,
+            min_value=0.0, max_value=1.0,
+            format="%.2f"
+        )
+        if particle_size_changed:
+            fluid.set_simulation_param(SimParams.PARTICLE_SIZE, fluid.particle_size)
+
+        smoothing_radius_changed, fluid.smoothing_radius = imgui.slider_float(
+            "Rayon d'influence des particules", fluid.smoothing_radius,
+            min_value=0.0, max_value=2.0,
+            format="%.2f"
+        )
+        if smoothing_radius_changed:
+            fluid.set_simulation_param(SimParams.SMOOTHING_RADIUS, fluid.smoothing_radius)
+
+        target_density_changed, fluid.target_density = imgui.slider_float(
+            "Densitée Désirée", fluid.target_density,
+            min_value=0.0, max_value=100.0,
+            format="%.2f"
+        )
+        if target_density_changed:
+            fluid.set_simulation_param(SimParams.TARGET_DENSITY, fluid.target_density)
+
+        pressure_cst_changed, fluid.pressure_cst = imgui.slider_float(
+            "Constante des pressions", fluid.pressure_cst,
+            min_value=-100.0, max_value=1000.0,
+            format="%.2f"
+        )
+        if pressure_cst_changed:
+            fluid.set_simulation_param(SimParams.PRESSURE_CST, fluid.pressure_cst)
+
+        gravity_changed, fluid.gravity = imgui.slider_float(
+            "Gravitée", fluid.gravity,
+            min_value=-100.0, max_value=100.0,
+            format="%.2f"
+        )
+        if gravity_changed:
+            fluid.set_simulation_param(SimParams.GRAVITY, fluid.gravity)
+
+        collision_factor_changed, fluid.collision_damping_factor = imgui.slider_float(
+            "Facteur de collisions", fluid.collision_damping_factor,
+            min_value=0.0, max_value=1.0,
+            format="%.2f"
+        )
+        if collision_factor_changed:
+            fluid.set_simulation_param(SimParams.COLLISION_DAMPING_FACTOR, fluid.collision_damping_factor)
+
+        viscosity_strength_changed, fluid.viscosity_strength = imgui.slider_float(
+            "Viscositée", fluid.viscosity_strength,
+            min_value=0.0, max_value=10.0,
+            format="%.2f"
+        )
+        if viscosity_strength_changed:
+            fluid.set_simulation_param(SimParams.VISCOSITY_STRENGTH, fluid.viscosity_strength)
+
         imgui.end()
 
 

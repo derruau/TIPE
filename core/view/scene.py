@@ -187,3 +187,11 @@ class Scene:
         glBufferData(GL_UNIFORM_BUFFER, matrices.nbytes, matrices, GL_STREAM_DRAW)
         # Les matrices projection et view sont au binding 0
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, buf)
+
+    def get_entities_from_label(self, label: str) -> list[Entity]:
+        l = []
+        e: Entity
+        for e in self.get_entities().values():
+            if e.get_label() == label:
+                l.append(e)
+        return l
