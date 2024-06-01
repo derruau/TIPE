@@ -12,6 +12,7 @@ Une entité est une classe générale qui contient les paramètres suivant:
 import pyrr
 import numpy as np
 from typing import Callable, TypedDict, NotRequired
+from math import sqrt
 
 PI = 3.14159
 
@@ -189,6 +190,11 @@ class Entity:
     def get_orientation(self) -> Eulers:
         return self.eulers
     
+    def get_distance_from(self, point: list[float]):
+        pos: list[float] = self.get_position()
+        v = [pos[0] - point[0], pos[1] - point[1], pos[2] - point[2]]
+        return sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
+    
     def destroy(self) -> None:
         if self.has_mesh:
             self.mesh.destroy()
@@ -236,7 +242,6 @@ class Camera(Entity):
         """
         phi = self.eulers[0]
         theta = self.eulers[1]
-
         # Le vecteur vers lequel la caméra pointe (convertion des coordonnées sphériques en cartésiennes)
         self.forward = np.array(
             [
@@ -245,6 +250,9 @@ class Camera(Entity):
                 np.sin(theta) * np.sin(phi),
             ],
         np.float32)
+        # Je sais pas trop pk j'ai besoin de faire un *-1 mais sans ça le vecteur forward est dans la mauvaise direction
+        # Ça a changé quand j'ai implémenté la rotation autour d'un point fixe, avant ça marchait bien sans...
+        self.forward *= -1
 
         # Le vecteur qui pointe vers la droite de la caméra par rapport à sa vue
         self.right = np.cross(self.forward, GLOBAL_Y)
@@ -256,12 +264,13 @@ class Camera(Entity):
         """
         Retourne la "View Matrix" qui est la matrice de transformation qui simule le mouvement de la caméra dans la scène.
         """
-        return pyrr.matrix44.create_look_at(
+        view_matrix = pyrr.matrix44.create_look_at(
             self.position,
             self.position + self.forward,
             self.up,
             np.float32
         )
+        return view_matrix
 
     def move_camera(
             self, 
@@ -286,6 +295,12 @@ class Camera(Entity):
         self.eulers[0] %= 2*PI
         self.eulers[1] = min(3, max(0.1, self.eulers[1])) # 0 ça représente le haut et 3 ~ pi le bas
         self.eulers[2] %= 2*PI
+
+    def look_at(self, point: list[float]):
+        v = np.array(point) - self.get_position()
+        l = sqrt(v[0]*v[0]+ v[1]*v[1] + v[2]*v[2])
+        v = v/l
+        self.forward = v
 
     def set_position(self, position: np.ndarray) -> None:
         self.position = position

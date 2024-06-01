@@ -6,7 +6,7 @@ class InputScheme:
     Une classe chargée de parser un fichier de configuration pour les contrôles du moteur de jeu.
     Elle donne aussi une couche d'abstraction pour savoir si une commande doit être déclenchée en fonction
     """
-    __slots__ = ("input_scheme")
+    __slots__ = ("input_scheme", "pressed_last_frame", "temp")
 
     def __init__(self, path: str) -> None:
         """
@@ -14,6 +14,8 @@ class InputScheme:
         """
         glfw.init()
         self.input_scheme = self.parse_input_scheme(path)
+        self.pressed_last_frame: dict[str: bool] = {}
+        self.temp: dict[str: bool] = {}
 
     def parse_input_scheme(self, path :str) -> dict[str: list[list[int]]]:
         """
@@ -61,3 +63,34 @@ class InputScheme:
             if result:
                 return True
         return False
+
+    def begin_input_frame(self):
+        self.temp = {}
+
+    def end_input_frame(self):
+        for key, value in self.temp.items():
+            self.pressed_last_frame[key] = value 
+
+    def on_press(self, action: str, keys: dict[int: bool]) -> bool:
+        """
+        Ne s'active qu'une seule fois lorsqu'on commence à appuyer sur un bouton
+        """
+        r = not(self.pressed_last_frame.get(action, False)) and keys.get(action, False)
+        self.temp[action] = keys.get(action, False)
+        return r
+    
+    def on_release(self, action: str, keys: dict[int: bool]) -> bool:
+        """
+        Ne s'active qu'une seule fois lorsqu'on relache un bouton.
+        """
+        r = self.pressed_last_frame.get(action, False) and not(keys.get(action, False))
+        self.temp[action] = keys.get(action, False)
+        return r
+        # if not (action in keys):
+        #     return False
+        # if action in self.pressed_last_frame:
+        #     if self.pressed_last_frame[action] == True:
+        #         if not keys[action]:
+        #             self.pressed_last_frame[action] = False
+        #             return True
+        # return False

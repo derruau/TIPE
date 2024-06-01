@@ -195,22 +195,27 @@ class Fluid(Entity):
         glNamedBufferSubData(self.params_buffer, name.value[0], name.value[1], value)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         
-    def get_simulation_param(self, name: SimParams) -> any:
+    def get_simulation_param(self, name: SimParams, from_gpu: bool = False) -> any:
         """
         Retourne le paramètre de la simulation demandé. Tout les paramètres
         qui peuvent être demandés sont dans l'enum SimParams
+
+        Le paramètre from_gpu est pour spécifier si on doit aller chercher le paramètre directement sur la carte graphique
+        ou si on prends la valeur en cache dans la classe Fluid
         """
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.params_buffer)
-        data = glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, name.value[0], name.value[1])
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        if name.value[2] == np.float32:
-            d = data.view('<f4')
-            return d[0] if len(d) == 1 else d
-        if name.value[2] == np.int32:
-            d = data.view('<i4')
-            return d[0] if len(d) == 1 else d
-        if name.value[2] == bool:
-            return data.view('<?')[0]
+        if from_gpu:
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.params_buffer)
+            data = glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, name.value[0], name.value[1])
+            glBindBuffer(GL_ARRAY_BUFFER, 0)
+            if name.value[2] == np.float32:
+                d = data.view('<f4')
+                return d[0] if len(d) == 1 else d
+            if name.value[2] == np.int32:
+                d = data.view('<i4')
+                return d[0] if len(d) == 1 else d
+            if name.value[2] == bool:
+                return data.view('<?')[0]
+        return getattr(self, name.name.lower())
 
     def get_buffers(self, binding_point: int, view_as: str = "<f4",start_point: int = 0, size: int = None) -> np.ndarray:
         """

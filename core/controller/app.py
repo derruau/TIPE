@@ -9,13 +9,17 @@ if TYPE_CHECKING:
 
 from OpenGL.GL import *
 import glfw
+import imgui
+from imgui.integrations.glfw import GlfwRenderer
 from core.view.rendering_engine import RenderingEngine
 
 PROFILING_PATH = "./profiling/"
 MAX_PROFILED_FRAMES_PER_SESSION = 1000
 
+PARAMETERS_MENU_WIDTH = 200
+
 class App:
-    __slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme", "scene", "rendering_engine", "delta", "last_frame")
+    __slots__ = ("window", "last_time", "frames_rendered", "keys", "handle_inputs", "input_scheme", "scene", "rendering_engine", "delta", "last_frame", "impl", "width", "height")
 
     def __init__(
             self, 
@@ -51,6 +55,7 @@ class App:
             raise RuntimeError("Impossible d'initialiser GLFW.")
         
         glfw.set_error_callback(self.error_callback)
+        
 
     def _init_window(
             self, 
@@ -78,7 +83,11 @@ class App:
         glfw.set_key_callback(self.window, self.keys_callback)
         glfw.set_mouse_button_callback(self.window, self.mouse_callback)
         glfw.swap_interval(1)
-        glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        #glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+
+        #Initilalisation de ImGUI
+        imgui.create_context()
+        self.impl = GlfwRenderer(self.window)
 
     def _init_OpenGL(self):
         """
@@ -153,18 +162,56 @@ class App:
         self.frames_rendered += 1
         self.last_frame = current_time
 
-    def set_scene(self, scene: Scene) -> None:
+    def set_scene(self, scene: Scene, render_to_frame_buffer: bool= False, dimensions: tuple[int, int] = (0, 0)) -> None:
         self.scene = scene
-        self.rendering_engine = RenderingEngine(self.scene)
+        self.rendering_engine = RenderingEngine(self.scene, render_to_frame_buffer, dimensions)
 
     def render_process(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
+        io = imgui.get_io()
         glfw.poll_events()
+        self.impl.process_inputs()
+
+        # start new frame context
+        imgui.new_frame()
+        
+        size = glfw.get_window_size(self.window)
+        imgui.set_next_window_size(PARAMETERS_MENU_WIDTH, size[1])
+        imgui.set_next_window_position(size[0] - PARAMETERS_MENU_WIDTH, 0)
+        imgui.begin("Paramètres",
+                     True,
+                     flags=imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_COLLAPSE,
+        )
+        imgui.text("Hello world!")
+        imgui.end()
+
+
+        imgui.set_next_window_size(size[0] - PARAMETERS_MENU_WIDTH, size[1])
+        imgui.set_next_window_position(0, 0)
+        imgui.begin("Rendu",
+                     True,
+                     flags=imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_COLLAPSE,
+        )
+        if imgui.is_window_hovered():
+            self.input_scheme.begin_input_frame()
+            self.handle_inputs(self.window, self.keys, self.scene, self.input_scheme)
+            self.input_scheme.end_input_frame()
+
+        window_content_size = imgui.get_window_size()
+        aspect_ratio = self.height / self.width
+        center_pos = imgui.Vec2(0, (window_content_size.y - window_content_size.x*aspect_ratio) * 0.5)
+        imgui.set_cursor_pos(center_pos)
+        imgui.image(self.rendering_engine.frame_buffer_texture, window_content_size.x, window_content_size.x*aspect_ratio, uv0=(1, 1), uv1=(0,0))
+        imgui.end()
+
+        imgui.render()
+        imgui.end_frame()
+        self.impl.render(imgui.get_draw_data())
+
 
         self.rendering_engine.render(self.delta)
 
-        glFlush()
+        glFinish()
         glfw.swap_buffers(self.window)
         self.calculate_fps()
 
@@ -184,8 +231,8 @@ class App:
             profile_directory = PROFILING_PATH + f"profile-{profile_id:0>4}/"
             Path(profile_directory).mkdir(parents=True, exist_ok=True)
 
-        width, height = glfw.get_window_size(self.window)
-        glfw.set_cursor_pos(self.window, width / 2, height / 2)
+        self.width, self.height = glfw.get_window_size(self.window)
+        glfw.set_cursor_pos(self.window, self.width / 2, self.height / 2)
         while not glfw.window_should_close(self.window):
             if profiling:
                 with cProfile.Profile() as profile:
@@ -204,4 +251,5 @@ class App:
         """
         glfw.destroy_window(self.window)
         glfw.terminate()
+        self.rendering_engine.destroy()
         self.scene.destroy_scene()

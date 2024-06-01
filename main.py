@@ -5,6 +5,7 @@ from core.controller.app import App
 from core.models.entity import Eulers
 from core.view.scene import Scene
 from fluid_simulation.fluid import Fluid
+from math import sin, cos
 
 PI = 3.14159
 
@@ -25,11 +26,11 @@ FAR_PLANE_CLIPPING = 1000.0
 SPEED = 0.3
 CAM_SENSITIVITY = 0.2
 VERTICAL_INVERT = -1
-HORIZONTAL_INVERT = -1
+HORIZONTAL_INVERT = 1
 CAMERA_MOVEMENT_THRESHOLD = 0.00001
-DEFAULT_CAMERA_POSITION = [0, 1, -10]
-DEFAULT_CAMERA_ANGLE = Eulers(True, [PI/2, PI/2, 0])
-CAMERA_PIVOT_POINT = np.array([0, 0, 0])
+DEFAULT_CAMERA_POSITION = [0, 1, -20]
+DEFAULT_CAMERA_ANGLE = Eulers(True, [-PI/2, PI/2, 0])
+CAMERA_PIVOT_POINT = [0, 0, 0]
 
 def handle_inputs(window, keys: dict[int, bool], scene :Scene, input_scheme: InputScheme) -> None:
     """
@@ -82,19 +83,39 @@ def handle_keys(window, keys: dict[int, bool], scene: Scene, input_scheme: Input
 
     camera.move_camera(d_pos, d_abs_pos)
 
+# C'est moche de faire avec une variable globale mais j'ai un peu la flemme de tout refaire donc ça fera le taf pour l'instant
+mouse_pos_when_clicked: tuple[int, int] = (WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2)
 def handle_mouse(window, keys: dict[int, bool], scene: Scene, input_scheme: InputScheme) -> None:
     """
     S'occupe de définir les actions à effectuer lorsqu'on bouge la souris et qu'on appuie sur ses boutons.
     """
-    if input_scheme.should_action_happen("click", keys):
-        pass
+    global mouse_pos_when_clicked
     camera = scene.get_camera()
-    x,y = glfw.get_cursor_pos(window)
-    d_eulers = CAM_SENSITIVITY * (WINDOW_WIDTH / 2 - x) * GLOBAL_X * HORIZONTAL_INVERT
-    d_eulers += CAM_SENSITIVITY * (WINDOW_HEIGHT / 2 - y) * GLOBAL_Y * VERTICAL_INVERT
+    if input_scheme.on_press("mouse_left", keys):
+        glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        mouse_pos_when_clicked = glfw.get_cursor_pos(window)
 
-    camera.change_orientation(Eulers(False, d_eulers.tolist()))
-    glfw.set_cursor_pos(window, WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2)
+    if input_scheme.should_action_happen("click", keys):
+        r = camera.get_distance_from(CAMERA_PIVOT_POINT)
+        phi, theta, _ = camera.get_orientation().get_degrees()
+        x,y = glfw.get_cursor_pos(window)
+        d_eulers = CAM_SENSITIVITY * (mouse_pos_when_clicked[0] - x) * GLOBAL_X * HORIZONTAL_INVERT
+        d_eulers += CAM_SENSITIVITY * (mouse_pos_when_clicked[1] - y) * GLOBAL_Y * VERTICAL_INVERT
+
+        ntheta = (theta + d_eulers[1])* PI / 180
+        nphi = (phi + d_eulers[0]) * PI  / 180
+
+        nx = r * sin(ntheta) * cos(nphi) + CAMERA_PIVOT_POINT[0]
+        ny = r * cos(ntheta) + CAMERA_PIVOT_POINT[2]
+        nz = r * sin(ntheta) * sin(nphi) + CAMERA_PIVOT_POINT[1]
+
+        camera.set_position(np.array([nx, ny, nz], dtype=np.float32))
+        camera.look_at(CAMERA_PIVOT_POINT)
+        camera.change_orientation(Eulers(False, d_eulers))
+        glfw.set_cursor_pos(window, mouse_pos_when_clicked[0], mouse_pos_when_clicked[1])
+
+    if input_scheme.on_release("mouse_left", keys):
+        glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
 
 def start_game() -> None:
@@ -109,7 +130,7 @@ def start_game() -> None:
     fluid.set_label("Fluide")
     scene.append_entity(fluid)
     
-    app.set_scene(scene)
+    app.set_scene(scene, render_to_frame_buffer=True, dimensions=(WINDOW_HEIGHT, WINDOW_WIDTH))
     app.start(profiling=False)
 
 if __name__ == "__main__":
