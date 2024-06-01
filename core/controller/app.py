@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from OpenGL.GL import *
 import glfw
 import imgui
+from numpy import array, float32
 from imgui.integrations.glfw import GlfwRenderer
 from core.view.rendering_engine import RenderingEngine
 from fluid_simulation.fluid import SimParams
@@ -89,7 +90,7 @@ class App:
 
         #Initilalisation de ImGUI
         imgui.create_context()
-        self.impl = GlfwRenderer(self.window)
+        self.impl = GlfwRenderer(self.window, attach_callbacks=True)
 
     def _init_OpenGL(self):
         """
@@ -253,11 +254,21 @@ class App:
 
         viscosity_strength_changed, fluid.viscosity_strength = imgui.slider_float(
             "Viscositée", fluid.viscosity_strength,
-            min_value=0.0, max_value=10.0,
-            format="%.2f"
+            min_value=0.0, max_value=1.0,
+            format="%.3f"
         )
         if viscosity_strength_changed:
             fluid.set_simulation_param(SimParams.VISCOSITY_STRENGTH, fluid.viscosity_strength)
+
+        scale_changed, fluid.scale = imgui.slider_float3(
+            "Taille de la simulation", *fluid.scale,
+            min_value=0.0, max_value=5.0,
+            format="%.1f"
+        )
+        if scale_changed:
+            fluid.particle_area.set_scale((2*array(fluid.scale)).tolist())
+            fluid.set_simulation_param(SimParams.SIMULATION_CORNER_1, array(fluid.scale, dtype=float32))
+            fluid.set_simulation_param(SimParams.SIMULATION_CORNER_2, -1*array(fluid.scale, dtype=float32))
 
         imgui.end()
 

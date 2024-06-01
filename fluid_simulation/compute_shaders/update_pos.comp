@@ -23,15 +23,15 @@ void resolveCollisions(uint index) {
     vec3 size = vec3(abs(sim_corner_2.x - sim_corner_1.x),abs(sim_corner_2.y - sim_corner_1.y),abs(sim_corner_2.z - sim_corner_1.z));
 
     if (abs(center.x - positions[index].x) > size.x) {
-        positions[index].x = center.x + sign(velocities[index].x) *( size.x - 0.01);
+        positions[index].x = center.x + sign(velocities[index].x) *( size.x - 0.001);
         velocities[index].x *= -1 * collisionDampingFactor;
     };
     if (abs(center.y - positions[index].y) > size.y) {
-        positions[index].y = center.y + sign(velocities[index].y) *(size.y - 0.01) ;
+        positions[index].y = center.y + sign(velocities[index].y) *(size.y - 0.001) ;
         velocities[index].y *= -1 * collisionDampingFactor;
     };
     if (abs(center.z - positions[index].z) > size.z) {
-        positions[index].z = center.z + sign(velocities[index].z) *(size.z - 0.01);
+        positions[index].z = center.z + sign(velocities[index].z) *(size.z - 0.001);
         velocities[index].z *= -1 * collisionDampingFactor;
     }
 }

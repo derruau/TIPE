@@ -33,7 +33,7 @@ out vec4 color;
 
 vec3 lightPosition = vec3(0.0, -10.0, -10.0);
 vec3 lightColor = vec3(1.0, 1.0, 1.0);
-float lightStrength = 0.5;
+float lightStrength = 0.8;
 
 vec3 velocityToColor(float velocity) {
     if (velocity < maxVelocity/2) {

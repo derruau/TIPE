@@ -27,9 +27,9 @@ FLUID_SHADER_PATH = {
     "VISCOSITY": "./fluid_simulation/compute_shaders/viscosity.comp",
 }
 
-PARTICLEAREA_MESH = Mesh("./assets/cube.obj", GL_TRIANGLES, False)
-PARTICLEAREA_MATERIAL = Material("./assets/white_borders.png", False)
-PARTICLEAREA_SHADERS = Shader("./core/shaders/vertex.vert", "./core/shaders/fragment.frag", False)
+PARTICLEAREA_MESH = Mesh("./assets/cube/cube.obj", GL_TRIANGLES, False)
+PARTICLEAREA_MATERIAL = Material("./assets/cube//white_borders.png", False)
+PARTICLEAREA_SHADERS = Shader("./assets/cube/vertex.vert", "./assets/cube/fragment.frag", False)
 PARTICLEAREA_LABEL = "PARTICLEAREA"
 
 FLUIDPARTICLE_MESH = Mesh("./assets/sphere.obj", GL_TRIANGLES, False)
@@ -137,6 +137,7 @@ class Fluid(Entity):
         """
         position = 0.5*(self.simulation_corner_1 + self.simulation_corner_2)
         scale = abs(self.simulation_corner_1 - self.simulation_corner_2)
+        self.scale = scale/2
 
         self.particle_area = Entity(
             position.tolist(),
