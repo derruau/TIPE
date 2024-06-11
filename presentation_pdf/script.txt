@@ -1,0 +1,128 @@
+Plan:
+    - Contexte -- 2 mins
+    - Introduction de la méthode SPH -- 3 mins
+    - Côté physique et mathématique de la méthode -- 4 mins
+    - Côté informatique de la méthode -- 3 mins
+    - Résultats -- 2 mins
+
+
+Texte:
+
+
+FRAME 1: 
+Bonjour,
+Dans le cadre de mon TIPE cette année, dont le thème est 'Jeux et Sports', je vais vous présenter mon projet de simulation de fluide en temps réel. L'objectif de ce travail était de comprendre pourquoi les simulations de fluide, malgré leur interactivité et leur potentiel ludique, restent peu fréquentes dans les jeux vidéo.
+
+FRAME 2:
+Pour clarifier, lorsque je parle de simulation de fluide, je ne fais pas référence à la simple présence d'eau statique dans un environnement. Je parle bien d'une simulation physique dynamique qui interagit avec son environnement. 
+Ces deux images illustrent bien mon propos. À gauche, l'eau est statique, intégrée à l'environnement sans réagir à ses changements. En revanche, à droite, l'eau interagit activement avec l'environnement.
+Mon objectif va donc être de coder une telle simulation en 3D, en se basant sur la mécanique des fluides et sur quelques techniques mathématiques d'approximation.
+
+FRAME 3: <-- CHANGER!!!
+Voici comment va se présenter l'exposé:
+    - Tout d'abord, je vais faire une toute petite introduction à la mécanique des fluides et à la méthode que nous allons utiliser pour faire la simulation
+    - Ensuite, je présenterai une technique mathématique qui nous aidera à trouver les expressions mathématiques simplifiées des équations physiques qui nous permetteront de faire tourner la simulation.
+    - Je discuterais ensuite des difficultés d'implémentation de l'algorithme et les solutions pour
+
+FRAME 4:
+Comme dit précédemment, je vais d'abord réaliser une petite introduction à la mécanique des fluides. Evidemment, comme on est en mécanique, le but est d'étudier le mouvement du fluide et pour ce faire, il existe deux points de vue différents:
+    - La description Eulerienne
+    - La description Lagrangienne
+
+FRAME: 5:
+La description eulerienne se concentre sur des points fixes dans l'espace à travers lesquels le fluide s'écoule. Les propriétés du fluide (comme la vitesse, la pression et la densité) sont décrites en fonction de la position spatiale M et du temps t. Dans cette approche, les variables d'intérêt sont définies pour chaque point fixe dans l'espace. Par exemple, la vitesse V à un point donné M à un instant t est représentée par: V(M,t). Ainsi c'est comme si observait ce qui se passe à des points fixes dans l'espace. Comme si l'on plaçait des capteurs dans le fluide et notait les variations à ces emplacements.
+
+FRAME 6:
+La description lagrangienne, en revanche, suit individuellement chaque particule de fluide au cours du temps. Ici, on se concentre sur un volume de fluide élémentaire particulier et on observe comment ses caractéristiques évoluent. Les variables d'intérêt sont définies en fonction du temps t et des particules de fluide spécifiques, suivies par leurs positions initiales M_0. Si M(t) représente la position d'une particule de fluide à un instant t, la description lagrangienne exprime les propriétés du fluide comme des fonctions du temps et de la position initiale des particules :
+M(t)=M(M_0,t)
+
+FRAME 7:
+Dans la pratique, la description eulerienne est préférée pour la résolution des équations de Navier-Stokes et la modélisation de grands systèmes fluides comme les océans et l'atmosphère, où les comportements locaux aux points fixes sont plus pertinents.
+La description lagrangienne quant à elle est utile pour analyser des problèmes où les trajectoires des particules sont cruciales, comme dans la simulation des mouvements de particules, ce qui m'amène à la choisir pour ce projet.
+
+
+FRAME 8:
+Maintenant que l'on sait comment nous allons décrire le fluide, il faut trouver les équations qui le régissent. Commençons par faire un principe fondamental de la dynamique sur une particule de fluide. On distingue deux types de forces appliqués à cette particule:
+    - Les forces de contact: les forces entre deux particules de fluides qui se touchent.
+    - Les forces à distance: les forces issues du poids, de la force de Lorentz, etc...
+
+FRAME 9:
+Pour les forces à distance on ne compte que le poids puisque je choisis arbitrairement de faire ma simulation dans un espace dépourvu de champs électromagnétique.
+
+FRAME 10:
+Les forces de contact peuvent quand à elles être subdivisées une seconde fois. Pour un élément de surface dS de la particule de fluide, on peut définir une force infinitésimale de contact tangentielle à la surface et une autre normale à celle-ci.
+On appelle la composante normale la force de pression et la composante tangentielle la viscositée.
+Après quelques calculs, on arrive aux formules suivantes pour les forces de pression et de viscositée.
+
+FRAME 11:
+En remplaçant toutes les forces obtenues dans le principe fondamental de la dynamique, on obtient l'équation de conservation de la quantité de mouvement de Navier-Stokes
+Celle ci est accompagnée d'une deuxième équation, nommé équation de conservation de la masse, qui s'interprète comme le fait que dans un système fermé le fluide ne peut spontanément être créé depuis une source
+ou spontanément détruit par un puit.
+
+FRAME 12:
+Le fait d'avoir les équations ne nous avance pas beaucoup lorsqu'il s'agit de la simulation puisqu'il s'avère que la résolution des équations de Navier Stokes est un des problèmes du millénaire. Il va donc falloir trouver une méthode pour réaliser la simulation. C'est ici qu'intervient la méthode d'hydrodynamique des particules lisses, que j'appelerais SPH à partir de maintenant. L'algorithme SPH vise à résoudre les équations de Navier-Stokes en considérant le fluide comme un ensemble discret de particules de fluide, chacune de rayon r et de masse m.
+
+FRAME 13:
+Ce point de vue offre de nombreux avantages puisque le nombre constant de particules de masse constante dans la simulation garantie le respect de l'équation de conservation de la masse. On peut donc arrêter de s'en soucier, ce qui simplifie la tache de la simulation.
+
+FRAME 14:
+De plus on peut supprimer le terme v\cdot \grad(v), appelé le terme d'advection. En effet, ce terme correspond au transport de matière dans le fluide. Or comme dans ce modèle, la matière transportée EST le fluide, ce terme s'annule.
+
+FRAME 15:
+On se retrouve à devoir juste résoudre l'équation suivante. Cela reste quand même un problème car la méthode SPH est une méthode qui utilise un nombre fini de particules pour modéliser un fluide qui, d'après les équations est un milieu continu. Il va donc d'abord falloir trouver une approximation discrète aux termes continus de cette équation.
+
+FRAME 16:
+C'est dans ce but que j'introduis la pseudo-fonction de Dirac. C'est un objet mathématique qui est définit nulle partout sauf en 0 où il vaut l'infini et donc l'intégrale sur R vaut 1. Usuellement il est défini comme la limite d'une suite de fonctions comme celle-ci.
+
+FRAME 17:
+Cet objet à une propriété que l'on appelle l'identité de Dirac. Si on prends une fonction quelconque g, cette intégrale est égale à g(t). Nous garderons cette propriété dans le coin de notre tête.
+
+FRAME 18:
+En statistique, pour extrapoler une fonction C1 f_h à partir d'un échantillonnage de n points X_1, ... X_n, on utilise la technique d'estimation par noyau. On estime que f(x) est égal à cette expression, où h est le paramètre de lissage et K est une fonction noyau de lissage. Elle assigne un 'poids de contribution' au point $x_i$ pour la valeur de la fonction $\hat{f}_h$ au point $x$ d'autant plus fort que la distance entre x et x_i est proche.
+
+FRAME 19:
+Pour visualiser ce que fait cette fonction, on peut regarder ce simple exemple. On estime que la valeur d'une fonction en un point x est environ égal à la moyenne des positions des points X_i qui sont proches de x.
+
+FRAME 20:
+Les fonctions de noyau doivent répondre à ces trois critères pour être considéré comme tel. Le plus important étant que la limite de K lorsque h tend vers 0 est le Dirac.
+
+FRAME 21:
+Armé de ces connaissances, nous pouvons désormais commencer à faire l'approximation discrète de fonctions. D'après l'équation de Navier Stokes, nous avons besoin de faire l'approximation discrète d'un champs vectoriel, d'un gradient et d'un laplacien.
+
+FRAME 22:
+En ce qui concerne le champs vectoriel, en posant les deux fonctions suivantes, on remarque que l'erreur commise n'est que du second degrè minimum, l'approximation est donc très bonne. De plus, en discrétisant l'intégrale, on peut écrire cette formule.
+
+FRAME 22:
+En faisant la même chose pour le gradient et le laplacien, on arrive à ces formules d'approximations discrètes, qui sont d'autant plus bonnes que la densité et le nombre de particule est élevé.
+
+FRAME 23:
+On obtient ainsi l'expression des différentes forces de la simulation
+
+FREAME 24:
+Maintenant qu'on a les formules on pourrait se dire que l'algorithme consiste juste à boucler sur toutes les particules et calculer les forces dans le bon ordre. Bien que cette approche soit possible, elle est extrèmement lente puisque l'algorithme serait de complexité O(n²) en le nombre de particules. En effet, pour chaque particule on doit prendre en compte l'effet qu'a chaque autre particule sur celle-ci.
+
+FRAME 25:
+Une première idée pour réduire le temps d'éxécution de l'algorithme serait de le faire tourner sur la carte graphique de l'ordinateur. En effet, une carte graphique, contrairement à un processeur, peut faire tourner en parallèle des centaines de calculs. Comme le calcul d'une nouvelle position de particule à l'instant t+dt ne dépends que de la position des particules à l'instant t on peut juste faire tourner en même temps le calcul de toutes les positions de toutes les particules. Cela réduirait le temps d'exécution à O(n) en le nombre de particules, ce qui est malheureusement encore trop lent pour une simulation de fluide qui requiert des dixaines de milliers de particules pour produire un effet réalistique.
+
+FRAME 25:
+Une autre méthode que l'on peut utiliser est de se rendre compte que le noyau de lissage va éliminer la plupart des particules éloignés de la particule d'intéret puisque sa valeur va être nulle. L'objectif pour améliorer les performances de l'algorithme serait donc de pouvoir n'itérer que sur les particules proches.
+
+FRAME 26:
+En informatique, pour régler ce genre de problème, on utilise ce qu'on appelle le partitionnement de l'espace. Le principe est de créer une structure de donnée qui représente aisément des régions de l'espace de notre simulation et qui peuvent facilement être trouvés. On stocke toutes les particules qui se trouve dans chacune des zones ... bla bla bla explication
++ on prends h comme rayon
++ on n'a qu'a calculer les particules qui se trouvent dans les 9 cases autour de la case dans laquelle est la particule.
+
+FRAME 27:
+Explique comment la structure de donnée marche
+
+FRAME 28:
+Explique qu'on a besoin de faire un tri en parallèle, plus rapide que tout les tris normaux. -> tri bitonique
++ Explication du tri bitonique
++ L'algorithme a une efficacité bien mieux puisqu'on ne check que plus que (dans mon cas en moyenne) 6% de toutes les particules.
+
+FRAME 29:
+On a donc un algorithme de simulation de fluide en temps réel complet qui tourne sur la carte graphique.
+Voici quelques performances et statistiques pour mesurer à quel point les optimisations ont aidés
+=> Avec et sans carte graphique
+=> Avec et sans partitionnement de l'espace
+=> Avec et sans tri bitonique

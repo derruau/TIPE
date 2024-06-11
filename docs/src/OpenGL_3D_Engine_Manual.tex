@@ -171,7 +171,7 @@ Maintenant que nous comprenons un peu mieux les fluides, il est temps d'établir
 
 La 2nde loi de newton s'écrit donc:
 \begin{align*}
-m \frac{d\vec{v}}{dt} &= \vec{F}_{contact} + \vec{F}_{distance}
+m \frac{d\vec{v}(t,x,y,z)}{dt} &= \vec{F}_{contact} + \vec{F}_{distance}
 \end{align*}
  On remarque que les forces à distances sont généralement définies volumiquement, c'est à dire que l'on peut factoriser un élément $d\tau$ à la force. Par exemple, le poids:
  $$\vec{P} = m\vec{g} = \rho d\tau \vec{g}$$
@@ -245,7 +245,7 @@ Une seconde équation peut être formulée pour les équations de Navier-Stokes.
 \begin{center}
  \includegraphics[width=0.8\textwidth]{equation_de_continuite_navier-stokes}
 \end{center}
-On arrive après quelques calculs à l'équation:
+On arrive après \href{https://femto-physique.fr/mecanique_des_fluides/cinematique.php#\%C3\%A9quation-de-continuit\%C3\%A9}{quelques calculs} à l'équation:
 $$ \frac{d \rho}{dt} + \rho \text{div } \vec{v} = 0$$
 Ce qui donne dans le cas d'un fluide incompréssible:
 $$ \boxed{\text{div } \vec{v} = 0} $$

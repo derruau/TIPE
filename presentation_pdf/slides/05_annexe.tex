@@ -1,0 +1,378 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Première diapo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{frame}
+    \frametitle{\anxpti}
+    \framesubtitle{}
+    
+    \centering {\huge \anxpti}
+    
+    \end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Deuxième diapo
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - fluid.py}
+    
+    \begin{minted}[fontsize=\tiny]{python3}
+class Fluid(Entity):
+    def __init__(self, particle_count: int, particle_size: float, simulation_corner_1: list[float], simulation_corner_2: list[float], particle_mesh: Mesh = FLUIDPARTICLE_MESH, particle_shaders: Shader = FLUIDPARTICLE_SHADERS) -> None:
+        ...
+    def init_fluid_shaders(self) -> None:
+        ...
+    def create_bounding_box(self, scene: Scene) -> tuple[np.ndarray, np.ndarray]:
+        ...
+    def create_initial_particle_positions(self, position: np.ndarray, scale: np.ndarray) -> np.ndarray:
+        ...
+    def set_simulation_param(self, name: SimParams, value: any) -> None:
+        ...
+    def get_simulation_param(self, name: SimParams, from_gpu: bool = False) -> any:
+        ...
+    def get_buffers(self, binding_point: int, view_as: str = "<f4",start_point: int = 0, size: int = None) -> np.ndarray:
+        ...
+    def mounted(self, scene: Scene) -> None:
+        ...
+    def draw(self, scene: Scene)-> None:
+        PARTICLEAREA_MATERIAL.use()
+        PARTICLEAREA_SHADERS.set_mat4x4("model", self.particle_area.get_model_matrix())
+        PARTICLEAREA_MESH.draw()
+
+        self.particle_shaders.set_vec3("camPos", scene.get_camera().get_position())
+        self.particle_mesh.prepare_to_draw()
+        # On dessine des instances de la particule et non n entités disctinctes pour aller beaucoup plus vite
+        glDrawArraysInstanced(GL_TRIANGLES, 0, self.particle_mesh.vertex_count ,self.particle_count)
+
+    \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - fluid.py}
+
+    \begin{minted}[fontsize=\tiny]{python3}
+    def update(self, delta:float, force_update = False) -> None:
+        if self.disable_simulation and not(force_update):
+            return 
+        
+        self.set_simulation_param(SimParams.DELTA, delta)
+
+        self.compute_external.dispatch(self.particle_count)
+        self.compute_spatial_hash.dispatch(self.particle_count)
+        self.compute_sort.sort_and_calculate_offsets()
+        self.compute_density.dispatch(self.particle_count)
+        self.compute_pressure.dispatch(self.particle_count)
+        self.compute_viscosity.dispatch(self.particle_count)
+        self.compute_update_pos.dispatch(self.particle_count)
+
+    def reset_simulation(self, particle_count: int) -> None:
+        ...
+    def destroy(self) -> None:
+        ...
+    \end{minted}
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - fluid.py}
+
+    \begin{minted}[fontsize=\tiny]{python3}
+class GPUSort:
+    def __init__(self, index_buffer_size: int) -> None:
+        ...
+    def next_power_of_2(self, x :int):
+        ...
+    def sort(self):
+        self.sort_shader.set_int("numEntries", self.buffer_size)
+        
+        num_stages = int(log2(self.next_power_of_2(self.buffer_size)))
+
+        for stage_index in range(num_stages):
+            for step_index in range(stage_index + 1):
+                # Même chose que 2**(stage_index - step_index) mais beaucoup plus rapide
+                groupWidth = 1 << (stage_index - step_index)
+                groupHeigth = 2* groupWidth - 1
+                self.sort_shader.set_int("groupWidth", groupWidth)
+                self.sort_shader.set_int("groupHeight", groupHeigth)
+                self.sort_shader.set_int("stepIndex", step_index)
+
+                instances_to_dispatch = self.next_power_of_2(self.buffer_size) // 2
+                self.sort_shader.dispatch(instances_to_dispatch)
+
+    def sort_and_calculate_offsets(self):
+        self.sort()
+
+        self.offset_shader.set_int("numEntries", self.buffer_size)
+        self.offset_shader.dispatch(self.buffer_size)
+    \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - density.comp}
+
+    \begin{minted}[fontsize=\tiny]{glsl}
+void calculateDensities(uint id) {
+    if (id >= numParticles) return;
+    vec3 pos = predictedPositions[id];
+    ivec3 originCell = GetCell3D(pos, smoothingRadius);
+    float sqrRadius = smoothingRadius * smoothingRadius;
+    float density = 0;
+    for (int i = 0; i < 27; i ++) {
+        int hash = HashCell3D(originCell + offsets3D[i]);
+        int key = KeyFromHash(hash, numParticles);
+        uint currIndex = spatialOffsets[key];
+        while (currIndex < numParticles) {
+            uvec3 indexData = spatialIndices[currIndex];
+            currIndex ++;
+            if (indexData[2] != key) break;
+            if (indexData[1] != hash) continue;
+            uint neighbourIndex = indexData[0];
+            vec3 neighbourPos = predictedPositions[neighbourIndex];
+            vec3 offsetToNeighbour = neighbourPos - pos;
+            float sqrDstToNeighbour = dot(offsetToNeighbour, offsetToNeighbour);
+            if (sqrDstToNeighbour > sqrRadius) continue;
+            float dst = sqrt(sqrDstToNeighbour);
+            density += DensityKernel(dst, smoothingRadius);
+        }
+    }
+    densities[id] = density;
+}
+    \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - externalForces.comp}
+
+    \begin{minted}[fontsize=\tiny]{glsl}
+void calculateGravity(uint index) {
+    if (index >= numParticles) return;
+
+    //Force de gravité
+    velocities[index] += vec3(0, gravity, 0) * delta;
+
+    predictedPositions[index] = positions[index] + velocities[index] * delta;
+}
+    \end{minted}
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - gpuSortOffset.comp}
+
+    \begin{minted}[fontsize=\tiny]{glsl}
+#version 460 core
+
+layout(binding=5, std430) buffer spatialIndicesBuffer { uvec3 spatialIndices[]; };
+layout(binding=6, std430) buffer spatialOffsetsBuffer { uint spatialOffsets[]; };
+
+uniform int numEntries;
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    
+    if (i >= numEntries) { return; }
+
+    uint null = numEntries;
+
+    uint key = spatialIndices[i].z;
+    uint keyPrev = i == 0 ? null : spatialIndices[i - 1].z;
+
+    if (key != keyPrev)
+    {
+        spatialOffsets[key] = i;
+    }
+}
+    \end{minted}
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - gpuSort.comp}
+
+    \begin{minted}[fontsize=\tiny]{glsl}
+#version 460 core
+// le veteur est de la forme (indexe d'origine, hash, clé)
+layout(binding=5, std430) buffer spatialIndicesBuffer { uvec3 spatialIndices[]; };
+uniform int numEntries;
+uniform int groupWidth;
+uniform int groupHeight;
+uniform int stepIndex;
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    uint hIndex = i & (groupWidth - 1);
+    uint indexLeft = hIndex + (groupHeight + 1) * (i / groupWidth);
+    uint rightStepSize = stepIndex == 0 ? groupHeight - 2 * hIndex : (groupHeight + 1) / 2;
+    uint indexRight = indexLeft + rightStepSize;
+    // S'arrete si on dépasse le nombre de particules à tier (lorsque le nombre de particules n'est pas une puissance de 2)
+    if (indexRight >= numEntries) return;
+    uint valueLeft = spatialIndices[indexLeft].z;
+    uint valueRight = spatialIndices[indexRight].z;
+    // On échange les valeurs si elles sont décroissantes
+    if (valueLeft > valueRight)
+    {
+        uvec3 temp = spatialIndices[indexLeft];
+        spatialIndices[indexLeft] = spatialIndices[indexRight];
+        spatialIndices[indexRight] = temp;
+    }
+};
+    \end{minted}
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - pressure.comp}
+
+    \begin{minted}[fontsize=\tiny]{glsl}
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= numParticles) return;
+    float density = densities[index];
+    float pressure = pressureFromDensity(density);
+    vec3 pressureForce = vec3(0);
+    vec3 pos = predictedPositions[index];
+    ivec3 originCell = GetCell3D(pos, smoothingRadius);
+    float sqrRadius = smoothingRadius * smoothingRadius;
+    for (int i = 0; i < 27; i ++) {
+        uint hash = HashCell3D(originCell + offsets3D[i]);
+        uint key = KeyFromHash(hash, numParticles);
+        uint currIndex = spatialOffsets[key];
+        while (currIndex < numParticles) {
+            uvec3 indexData = spatialIndices[currIndex];
+            currIndex ++;
+            if (indexData[2] != key) break;
+            if (indexData[1] != hash) continue;
+            uint neighbourIndex = indexData[0];
+            if (neighbourIndex == index) continue;
+            vec3 neighbourPos = predictedPositions[neighbourIndex];
+            vec3 offsetToNeighbour = neighbourPos - pos;
+            float sqrDstToNeighbour = dot(offsetToNeighbour, offsetToNeighbour);
+            if (sqrDstToNeighbour > sqrRadius) continue;
+            float densityNeighbour = densities[neighbourIndex];
+            float neighbourPressure = pressureFromDensity(densityNeighbour);
+            float sharedPressure = (pressure + neighbourPressure) / 2;
+            float dst = sqrt(sqrDstToNeighbour);
+            vec3 dir = dst > 0 ? offsetToNeighbour / dst : vec3(0, 1, 0);
+            pressureForce += dir * DensityDerivative(dst, smoothingRadius) * sharedPressure / densityNeighbour;
+        }
+    }
+    vec3 acceleration = pressureForce / density;
+    velocities[index] += acceleration * delta;
+}
+    \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - spatialHash.comp}
+
+    \begin{minted}[fontsize=\tiny]{glsl}
+const int hashK1 = 15823;
+const int hashK2 = 9737333;
+const int hashK3 = 440817757;
+
+ivec3 GetCell3D(vec3 position, float radius) {
+    return ivec3(position.x / radius, position.y / radius, position.z / radius);
+}
+
+int HashCell3D(ivec3 cell) {
+    return cell.x * hashK1 + cell.y * hashK2 + cell.z * hashK3;
+}
+
+uint KeyFromHash(uint hash, int tableSize) {
+    return hash % tableSize;
+}
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= numParticles) return;
+    spatialOffsets[index] = numParticles;
+    ivec3 cell = GetCell3D(predictedPositions[index], smoothingRadius);
+    uint hash = HashCell3D(cell);
+    uint key = KeyFromHash(hash, numParticles);
+    spatialIndices[index] = uvec3(index, hash, key);
+}
+    \end{minted}
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - updatePos.comp}
+
+    \begin{minted}[fontsize=\tiny]{glsl}
+void resolveCollisions(uint index) {
+    vec3 center = (sim_corner_1 + sim_corner_2) * 0.5;
+    vec3 size = vec3(abs(sim_corner_2.x - sim_corner_1.x),abs(sim_corner_2.y - sim_corner_1.y),abs(sim_corner_2.z - sim_corner_1.z));
+
+    if (abs(center.x - positions[index].x) > size.x) {
+        positions[index].x = center.x + sign(velocities[index].x) *( size.x - 0.001);
+        velocities[index].x *= -1 * collisionDampingFactor;
+    };
+    if (abs(center.y - positions[index].y) > size.y) {
+        positions[index].y = center.y + sign(velocities[index].y) *(size.y - 0.001) ;
+        velocities[index].y *= -1 * collisionDampingFactor;
+    };
+    if (abs(center.z - positions[index].z) > size.z) {
+        positions[index].z = center.z + sign(velocities[index].z) *(size.z - 0.001);
+        velocities[index].z *= -1 * collisionDampingFactor;
+    }
+}
+
+
+void UpdatePositions(uint id)
+{
+    if (id >= numParticles) return;
+
+    positions[id] += velocities[id]* 1/60;
+    resolveCollisions(id);
+}
+    \end{minted}
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \frametitle{\anxpti}
+    \framesubtitle{Code - updatePos.comp}
+
+    \begin{minted}[fontsize=\tiny]{glsl}
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= numParticles) return;
+    vec3 pos = predictedPositions[id];
+    ivec3 originCell = GetCell3D(pos, smoothingRadius);
+    float sqrRadius = smoothingRadius * smoothingRadius;
+    vec3 viscosityForce = vec3(0);
+    vec3 velocity = velocities[id];
+    for (int i = 0; i < 27; i ++) {
+        uint hash = HashCell3D(originCell + offsets3D[i]);
+        uint key = KeyFromHash(hash, numParticles);
+        uint currIndex = spatialOffsets[key];
+        while (currIndex < numParticles) {
+            uvec3 indexData = spatialIndices[currIndex];
+            currIndex ++;
+            if (indexData[2] != key) break;
+            if (indexData[1] != hash) continue;
+            uint neighbourIndex = indexData[0];
+            if (neighbourIndex == id) continue;
+            vec3 neighbourPos = predictedPositions[neighbourIndex];
+            vec3 offsetToNeighbour = neighbourPos - pos;
+            float sqrDstToNeighbour = dot(offsetToNeighbour, offsetToNeighbour);
+            if (sqrDstToNeighbour > sqrRadius) continue;
+            float dst = sqrt(sqrDstToNeighbour);
+            vec3 neighbourVelocity = velocities[neighbourIndex];
+            viscosityForce += (neighbourVelocity - velocity) * SmoothingKernelPoly6(dst, smoothingRadius);
+        }}
+    velocities[id] += viscosityForce * viscosityStrength * delta;
+}
+    \end{minted}
+\end{frame}

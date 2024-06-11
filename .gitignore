@@ -1,3 +1,9 @@
+#Fichiers du code python
 venv/
 __pycache__/
 profiling/
+
+#Ignore tout les fichiers de build sauf le pdf
+presentation_pdf/build/*
+!presentation_pdf/build/*.pdf
+

@@ -9,8 +9,8 @@ from math import sin, cos
 
 PI = 3.14159
 
-WINDOW_HEIGHT = 480
-WINDOW_WIDTH = 680 
+WINDOW_HEIGHT = 720
+WINDOW_WIDTH = 1280 
 WINDOW_TITLE = "Moteur de jeu"
 
 GLOBAL_X = np.array([1,0,0], dtype=np.float32)
