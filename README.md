@@ -82,6 +82,18 @@ tourner la simulation assez vite pour être visionnée en temps réel.
 
 [6] NUTTAPONG CHENTANEZ : Real-time Simulation of Large Bodies of Water with Small Scale Details : [lien](https://matthias-research.github.io/pages/publications/hfFluid.pdf)
 
+### DOT
+[1] : 28 octobre 2023: Début du TIPE
+
+[2] : 8 novembre 2023: Moteur 3D fini
+
+[3] : Vacances de Noël: Recherche sur la méthode SPH
+
+[4] : Janvier 2024: Apprentissage des shaders OpenGL
+
+[5] : 16 mai 2024 à 1er juin 2024: Codage de la simulation
+
+[6] : 1er juin 2024 à 10 juin 2024: Conception de la présentation
 
 ## Installation et lancement
 ### Installation
