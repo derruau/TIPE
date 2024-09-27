@@ -130,7 +130,7 @@ Pour lancer le projet, suivre les instructions suivantes:
 # Sous Linux
 source ./venv/bin/activate
 # Sous windows
-venv\bin\activate
+.\venv\Scripts\activate
 ```
 
 
@@ -152,6 +152,8 @@ Le moteur de jeu utilise la structure '[model view controller](https://fr.wikipe
 
  - Le dossier ``./assets/`` contient tout les objets 3D et images qui sont utilisées dans ce projet.
 
+# Bugs connus
+1. Changer le nombre de particules dans la simulation avec ImGUI fait souvent bugger le programme, surement car j'ai implémenté l'UI très vite et que je n'ai pas vraiment pris le temps de voir comment ImGUI fonctionne
 
 # TODO
 - Intégrer ImGUI et faire un UI sympa
