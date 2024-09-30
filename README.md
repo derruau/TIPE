@@ -80,7 +80,10 @@ tourner la simulation assez vite pour être visionnée en temps réel.
 
 [5] JIMMY ROUSSEL : Cours de physique: Mécanique des fluides : [lien](https://femto-physique.fr/mecanique_des_fluides/pdf/book_mecaflu.pdf)
 
-[6] NUTTAPONG CHENTANEZ : Real-time Simulation of Large Bodies of Water with Small Scale Details : [lien](https://matthias-research.github.io/pages/publications/hfFluid.pdf)
+[6] NUTTAPONG CHENTANEZ : Real-time Simulation of Large Bodies of emps réel dans le cadre du sujet "Jeux et Sports".
+Topics
+python realtime fluid-simulation opengl43
+Water with Small Scale Details : [lien](https://matthias-research.github.io/pages/publications/hfFluid.pdf)
 
 ### DOT
 [1] : 28 octobre 2023: Début du TIPE
@@ -100,7 +103,7 @@ tourner la simulation assez vite pour être visionnée en temps réel.
 Pour installer ce projet, suivre les instructions suivantes
 1. Télécharger localement une copie du projet 
 ```bash
-git clone https://github.com/XxJean-YvesxX/TIPE
+git clone https://github.com/derruau/TIPE
 ```
 
 2. Se rendre dans le fichier et créer un environnement virtuel python
