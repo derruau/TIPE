@@ -113,7 +113,7 @@ cd TIPE && python -m venv venv
 # Sous Linux
 source ./venv/bin/activate
 # Sous windows
-venv\bin\activate
+.\venv\Scripts\activate
 ```
 
 4. Installer les dépendences requises
