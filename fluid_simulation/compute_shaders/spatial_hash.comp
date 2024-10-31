@@ -42,9 +42,9 @@ void main() {
     uint index = gl_GlobalInvocationID.x;
 	if (index >= numParticles) return;
 
-	// Reset offsets
+	// Reset des offsets
 	spatialOffsets[index] = numParticles;
-	// Update index buffer
+	// Mise à jour de l'index buffer
 	ivec3 cell = GetCell3D(predictedPositions[index], smoothingRadius);
 	uint hash = HashCell3D(cell);
 	uint key = KeyFromHash(hash, numParticles);

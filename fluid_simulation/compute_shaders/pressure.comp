@@ -96,7 +96,7 @@ void main() {
     uint index = gl_GlobalInvocationID.x;
     if (index >= numParticles) return;
 
-	// Calculate pressure
+	// Calcul de la pression
 	float density = densities[index];
 	float pressure = pressureFromDensity(density);
 	vec3 pressureForce = vec3(0);
@@ -105,7 +105,7 @@ void main() {
 	ivec3 originCell = GetCell3D(pos, smoothingRadius);
 	float sqrRadius = smoothingRadius * smoothingRadius;
 
-	// Neighbour search
+	// Recherche parmis les cellules voisines
 	for (int i = 0; i < 27; i ++)
 	{
 		uint hash = HashCell3D(originCell + offsets3D[i]);
@@ -116,23 +116,23 @@ void main() {
 		{
 			uvec3 indexData = spatialIndices[currIndex];
 			currIndex ++;
-			// Exit if no longer looking at correct bin
+			// Mesure de sécuritée
 			if (indexData[2] != key) break;
-			// Skip if hash does not match
+			// On passe si le hash est incorrect
 			if (indexData[1] != hash) continue;
 
 			uint neighbourIndex = indexData[0];
-			// Skip if looking at self
+			// On passe si la cellule regardée est nous même
 			if (neighbourIndex == index) continue;
 
 			vec3 neighbourPos = predictedPositions[neighbourIndex];
 			vec3 offsetToNeighbour = neighbourPos - pos;
 			float sqrDstToNeighbour = dot(offsetToNeighbour, offsetToNeighbour);
 
-			// Skip if not within radius
+			// On passe si on est en dehors du rayon
 			if (sqrDstToNeighbour > sqrRadius) continue;
 
-			// Calculate pressure force
+			// Calcul des forces de pression
 			float densityNeighbour = densities[neighbourIndex];
 			float neighbourPressure = pressureFromDensity(densityNeighbour);
 

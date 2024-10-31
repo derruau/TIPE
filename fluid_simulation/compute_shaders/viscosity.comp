@@ -95,7 +95,7 @@ void main() {
 	vec3 viscosityForce = vec3(0);
 	vec3 velocity = velocities[id];
 
-	// Neighbour search
+	// Recherche parmis les voisins
 	for (int i = 0; i < 27; i ++)
 	{
 		uint hash = HashCell3D(originCell + offsets3D[i]);
@@ -106,23 +106,23 @@ void main() {
 		{
 			uvec3 indexData = spatialIndices[currIndex];
 			currIndex ++;
-			// Exit if no longer looking at correct bin
+			// Mesure de sécuritée
 			if (indexData[2] != key) break;
-			// Skip if hash does not match
+			// On passe si le hash est incorrect
 			if (indexData[1] != hash) continue;
 
 			uint neighbourIndex = indexData[0];
-			// Skip if looking at self
+			// On passe si la cellule regardée est nous même
 			if (neighbourIndex == id) continue;
 
 			vec3 neighbourPos = predictedPositions[neighbourIndex];
 			vec3 offsetToNeighbour = neighbourPos - pos;
 			float sqrDstToNeighbour = dot(offsetToNeighbour, offsetToNeighbour);
 
-			// Skip if not within radius
+			// On passe si on est en dehors du rayon
 			if (sqrDstToNeighbour > sqrRadius) continue;
 
-			// Calculate viscosity
+			// Calcule de la viscositée
 			float dst = sqrt(sqrDstToNeighbour);
 			vec3 neighbourVelocity = velocities[neighbourIndex];
 			viscosityForce += (neighbourVelocity - velocity) * SmoothingKernelPoly6(dst, smoothingRadius);

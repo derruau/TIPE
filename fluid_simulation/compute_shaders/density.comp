@@ -96,9 +96,8 @@ void calculateDensities(uint id) {
 	ivec3 originCell = GetCell3D(pos, smoothingRadius);
 	float sqrRadius = smoothingRadius * smoothingRadius;
 	float density = 0;
-	//float nearDensity = 0;
 
-	// Neighbour search
+	// Recherche parmis les cellules voisines
 	for (int i = 0; i < 27; i ++)
 	{
 		int hash = HashCell3D(originCell + offsets3D[i]);
@@ -109,9 +108,9 @@ void calculateDensities(uint id) {
 		{
 			uvec3 indexData = spatialIndices[currIndex];
 			currIndex ++;
-			// Exit if no longer looking at correct bin
+			// Mesure de sécuritée
 			if (indexData[2] != key) break;
-			// Skip if hash does not match
+			// On passe si le hash est incorrect
 			if (indexData[1] != hash) continue;
 
 			uint neighbourIndex = indexData[0];
@@ -119,17 +118,16 @@ void calculateDensities(uint id) {
 			vec3 offsetToNeighbour = neighbourPos - pos;
 			float sqrDstToNeighbour = dot(offsetToNeighbour, offsetToNeighbour);
 
-			// Skip if not within radius
+			// On passe si en dehors du rayon
 			if (sqrDstToNeighbour > sqrRadius) continue;
 
-			// Calculate density and near density
+			// Calcul de la densitée
 			float dst = sqrt(sqrDstToNeighbour);
-			density += DensityKernel(dst, smoothingRadius); // A implémenter
-			//nearDensity += NearDensityKernel(dst, smoothingRadius);
+			density += DensityKernel(dst, smoothingRadius);
 		}
 	}
 	
-	densities[id] = density; //float2(density, nearDensity);
+	densities[id] = density;
 }
 
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;

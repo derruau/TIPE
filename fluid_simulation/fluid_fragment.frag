@@ -57,7 +57,6 @@ void main() {
 
     vec3 lightDirectionToPixel = lightPosition - fragmentPosition;
     float dst = length(lightDirectionToPixel);
-    //lightDirectionToPixel = (lightDirectionToPixel);
     vec3 cameraDirectionToPixel = camPos - fragmentPosition;
     vec3 halfway = normalize(lightDirectionToPixel + cameraDirectionToPixel);
 

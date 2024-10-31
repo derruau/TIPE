@@ -41,7 +41,8 @@ void main() {
     float y = positions[gl_InstanceID][1];
     float z = positions[gl_InstanceID][2];
     
-    //Ne pas demander d'explication pour le *2, c'est juste comme ça 
+    // Ne pas demander d'explication pour le *2, c'est juste comme ça !!
+    // Pour une raison que j'ignore, l'algorithme ne marche pas sans.
     mat4 model = mat4(
         particleSize*2, 0, 0, 0,
         0, particleSize*2, 0, 0,
@@ -49,7 +50,6 @@ void main() {
         x, y, z, 1
     );
     gl_Position = projection * view * model * vec4(vertexPos, 1.0);
-    //fragmentNormal = mat3(model) * vertexNormal;
     fragmentNormal = mat3(model) * normalize(vertexPos);
     fragmentPosition = (model * vec4(vertexPos, 0.0)).xyz;
     instanceID = gl_InstanceID;
